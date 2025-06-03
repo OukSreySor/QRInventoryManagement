@@ -19,7 +19,7 @@ namespace JwtAuth.Controllers
         }
 
         [HttpGet("transactions")]
-        public IActionResult GetTransactions()
+        public IActionResult GetTransactions(DateTime? startDate, DateTime? endDate, string? username)
         {
             var userId = GetValidUserId();
             var userRole = GetValidUserRole();
@@ -34,11 +34,30 @@ namespace JwtAuth.Controllers
                 .Include(so => so.User)
                 .AsQueryable();
 
+            // User role Limitation
             if (userRole == "User")
             {
                 stockInsQuery = stockInsQuery.Where(si => si.UserId == userId);
                 stockOutsQuery = stockOutsQuery.Where(so => so.UserId == userId);
             }
+            // Filter by date range
+            if (startDate.HasValue)
+            {
+                stockInsQuery = stockInsQuery.Where(si => si.ReceivedDate >= startDate);
+                stockOutsQuery = stockOutsQuery.Where(so => so.SoldDate >= startDate);
+            }
+            if (endDate.HasValue)
+            {
+                stockInsQuery = stockInsQuery.Where(si => si.ReceivedDate <= endDate);
+                stockOutsQuery = stockOutsQuery.Where(so => so.SoldDate <= endDate);
+            }
+            // Filter by username (admin only)
+            if (!string.IsNullOrEmpty(username) && userRole == "Admin")
+            {
+                stockInsQuery = stockInsQuery.Where(si => si.User.Username.Contains(username));
+                stockOutsQuery = stockOutsQuery.Where(so => so.User.Username.Contains(username));
+            }
+
             var stockIns = stockInsQuery
                 .Select(si => new TransactionDto
                 {
