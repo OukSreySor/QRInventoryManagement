@@ -22,17 +22,23 @@ namespace JwtAuth.Controllers
         [HttpPost("stock-out")]
         public IActionResult StockOut(StockOutDto stockOutDto)
         {
+            var userId = GetValidUserId(); 
+            var userRole = GetValidUserRole();
+
             var productItem = context.ProductItems.FirstOrDefault(pi => pi.Id == stockOutDto.ProductItemId);
             if (productItem == null)
                 return NotFound($"ProductItem with Id {stockOutDto.ProductItemId} not found.");
+
+            if (userRole == "User" && productItem.UserId != userId)
+            {
+                return Forbid("You are not allowed to stock out this product item.");
+            }
 
             if (productItem.Status != "InStock")
                 return BadRequest("ProductItem is not currently in stock.");
 
             // Update item status to Sold 
             productItem.Status = "Sold";
-
-            var userId = GetValidUserId();
 
             // Create stock out record
             var stockOut = new StockOut

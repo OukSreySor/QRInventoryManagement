@@ -32,11 +32,17 @@ namespace JwtAuth.Controllers
         public IActionResult StockIn(StockInDto stockInDto)
         {
             var userId = GetValidUserId();
+            var userRole = GetValidUserRole();
 
             var productItem = context.ProductItems.FirstOrDefault(pi => pi.Id == stockInDto.ProductItemId);
             if (productItem == null)
                 return NotFound($"ProductItem with Id {stockInDto.ProductItemId} not found.");
-            
+
+            if (userRole == "User" && productItem.UserId != userId)
+            {
+                return Forbid("You are not allowed to stock in this product item.");
+            }
+
             if (productItem.Status == "InStock")
                 return BadRequest("Product item already stocked in.");
 

@@ -200,19 +200,34 @@ namespace JwtAuth.Controllers
         public IActionResult EditProductItem(int id, ProductItemDto productItemDto)
         {
             var userId = GetValidUserId();
+            var userRole = GetValidUserRole();
 
-            var productItem = context.ProductItems.FirstOrDefault(pi => pi.Id == id && pi.UserId == userId);
+            var productItemQuery = context.ProductItems.Where(pi => pi.Id == id);
+
+            if (userRole == "User")
+            {
+                productItemQuery = productItemQuery.Where(pi => pi.UserId == userId);
+            }
+
+            var productItem = productItemQuery.FirstOrDefault();
             if (productItem == null)
             {
                 return NotFound();
             }
 
-            productItem.QR_Code = productItemDto.QR_Code;
+            var productExists = context.Products.Any(p => p.Id == productItemDto.ProductId &&
+                                              (userRole == "Admin" || p.UserId == userId));
+            if (!productExists)
+            {
+                return BadRequest("Invalid ProductId or access denied.");
+            }
+
             productItem.Serial_Number = productItemDto.Serial_Number;
             productItem.Status = productItemDto.Status;
             productItem.Manufacturing_Date = productItemDto.Manufacturing_Date;
             productItem.Expiry_Date = productItemDto.Expiry_Date;
             productItem.ProductId = productItemDto.ProductId;
+            productItem.UpdatedAt = DateTime.UtcNow;
 
             context.SaveChanges();
 
@@ -223,7 +238,16 @@ namespace JwtAuth.Controllers
         public IActionResult DeleteProductItem(int id)
         {
             var userId = GetValidUserId();
-            var item = context.ProductItems.FirstOrDefault(pi => pi.Id == id && pi.UserId == userId);
+            var userRole = GetValidUserRole();
+
+            var productItemQuery = context.ProductItems.Where(pi => pi.Id == id);
+
+            if (userRole == "User")
+            {
+                productItemQuery = productItemQuery.Where(pi => pi.UserId == userId);
+            }
+
+            var item = productItemQuery.FirstOrDefault();
             if (item == null)
             {
                 return NotFound("ProductItem not found.");

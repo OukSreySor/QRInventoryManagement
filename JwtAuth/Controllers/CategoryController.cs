@@ -101,9 +101,15 @@ namespace JwtAuth.Controllers
             public IActionResult EditCategory(int id, CategoryDto categoryDto)
             {
                 var userId = GetValidUserId();
+                var userRole = GetValidUserRole();
 
-                var category = context.Categories
-                    .FirstOrDefault(c => c.Id == id && c.UserId == userId);
+                var categoryQuery = context.Categories.Where(c => c.Id == id);
+
+                if (userRole == "User")
+                {
+                    categoryQuery = categoryQuery.Where(c => c.UserId == userId);
+                }
+                var category = categoryQuery.FirstOrDefault();
 
                 if (category == null)
                 {
@@ -113,8 +119,9 @@ namespace JwtAuth.Controllers
                 category.Name = categoryDto.Name;
                 category.Description = categoryDto.Description;
                 category.UserId = userId;
+                category.UpdatedAt = DateTime.UtcNow;
 
-                context.SaveChanges();
+            context.SaveChanges();
                 return Ok("Category updated successfully.");
             }
 
@@ -122,8 +129,16 @@ namespace JwtAuth.Controllers
             public IActionResult DeleteCategory(int id)
             {
                 var userId = GetValidUserId();
+                var userRole = GetValidUserRole();
 
-                var category = context.Categories
+                var categoryQuery = context.Categories.Where(c => c.Id == id);
+
+                if (userRole == "User")
+                {
+                    categoryQuery = categoryQuery.Where(c => c.UserId == userId);
+                }
+
+                var category = categoryQuery
                     .Include(c => c.Products)
                     .FirstOrDefault(c => c.Id == id && c.UserId == userId);
 

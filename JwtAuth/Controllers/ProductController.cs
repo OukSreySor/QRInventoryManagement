@@ -139,7 +139,16 @@ namespace JwtAuth.Controllers
         public IActionResult EditProduct(int id, ProductDto productDto)
         {
             var userId = GetValidUserId();
-            var product = context.Products.FirstOrDefault(p => p.Id == id && p.UserId == userId);
+            var userRole = GetValidUserRole();
+
+            var productQuery = context.Products.Where(p => p.Id == id);
+
+            if(userRole == "User")
+            {
+                productQuery = productQuery.Where(p => p.UserId == userId);
+            }
+
+            var product = productQuery.FirstOrDefault();
 
             if (product == null)
             {
@@ -152,7 +161,8 @@ namespace JwtAuth.Controllers
             product.Unit_Price = productDto.Unit_Price;
             product.Selling_Price = productDto.Selling_Price;
             product.CategoryId = productDto.CategoryId;
-           
+            product.UpdatedAt = DateTime.UtcNow;
+
             context.SaveChanges();
 
             return Ok(product);
@@ -163,8 +173,16 @@ namespace JwtAuth.Controllers
         public IActionResult DeleteProduct(int id) 
         {
             var userId = GetValidUserId();
-            var product = context.Products.FirstOrDefault(p => p.Id == id && p.UserId == userId);
+            var userRole = GetValidUserRole();
 
+            var productQuery = context.Products.Where(p => p.Id == id);
+
+            if (userRole == "User")
+            {
+                productQuery = productQuery.Where(p => p.UserId == userId);
+            }
+
+            var product = productQuery.FirstOrDefault();
             if (product == null)
             {
                 return NotFound();
