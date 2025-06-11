@@ -1,4 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
+using JwtAuth.Entity.Enums;
 
 namespace JwtAuth.Models
 {
@@ -11,6 +13,9 @@ namespace JwtAuth.Models
         public required decimal Unit_Price { get; set; }
         public required decimal Selling_Price { get; set; }
         public int Quantity { get; set; }
+
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        public ProductStatus Status { get; set; }
         public required int CategoryId { get; set; }
         public Guid UserId { get; set; }
         public ICollection<ProductItemDto> ProductItems { get; set; } = new List<ProductItemDto>();

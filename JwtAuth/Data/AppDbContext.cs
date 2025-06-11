@@ -92,6 +92,17 @@ namespace JwtAuth.Data
                 .HasForeignKey(t => t.ProductItemId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<Transaction>()
+            .Property(t => t.TransactionType)
+            .HasConversion<string>();
+
+            modelBuilder.Entity<Product>()
+                .Property(p => p.Status)
+                .HasConversion<string>();
+
+            modelBuilder.Entity<ProductItem>()
+                .Property(pi => pi.Status)
+                .HasConversion<string>();
         }
 
 

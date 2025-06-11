@@ -1,6 +1,8 @@
 ﻿using JwtAuth.Data;
 using JwtAuth.Entity;
+using JwtAuth.Entity.Enums;
 using JwtAuth.Models;
+using JwtAuth.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -14,9 +16,11 @@ namespace JwtAuth.Controllers
     public class ProductController : BaseController
     {
         private readonly AppDbContext context;
-        public ProductController(AppDbContext context)
+        private readonly ProductService productService;
+        public ProductController(AppDbContext context, ProductService productService)
         {
             this.context = context;
+            this.productService = productService;
         }
 
         [HttpGet]
@@ -45,9 +49,10 @@ namespace JwtAuth.Controllers
                 Image = p.Image,
                 Unit_Price = p.Unit_Price,
                 Selling_Price = p.Selling_Price,
-                Quantity = p.ProductItems.Count(pi => pi.Status == "InStock"),
+                Quantity = p.ProductItems.Count(pi => pi.Status == ProductItemStatus.InStock),
                 CategoryId = p.CategoryId,
                 UserId = p.UserId,
+                Status = p.Status,
                 ProductItems = p.ProductItems.Select(pi => new ProductItemDto
                 {
                     Id = pi.Id,
@@ -86,9 +91,10 @@ namespace JwtAuth.Controllers
                     Image = p.Image,
                     Unit_Price = p.Unit_Price,
                     Selling_Price = p.Selling_Price,
-                    Quantity = p.ProductItems.Count(pi => pi.Status == "InStock"),
+                    Quantity = p.ProductItems.Count(pi => pi.Status == ProductItemStatus.InStock),
                     CategoryId = p.CategoryId,
                     UserId = p.UserId,
+                    Status = p.Status,  
                     ProductItems = p.ProductItems
                         .Select(pi => new ProductItemDto
                         {
@@ -131,7 +137,7 @@ namespace JwtAuth.Controllers
 
             context.Products.Add(product);
             context.SaveChanges();
-
+            productService.UpdateProductStatus(product.Id);
             return Ok(product);
 
         }
@@ -161,6 +167,10 @@ namespace JwtAuth.Controllers
             product.Unit_Price = productDto.Unit_Price;
             product.Selling_Price = productDto.Selling_Price;
             product.CategoryId = productDto.CategoryId;
+            if (productDto.Status == ProductStatus.Discontinued)
+            {
+                product.Status = ProductStatus.Discontinued;
+            }
             product.UpdatedAt = DateTime.UtcNow;
 
             context.SaveChanges();

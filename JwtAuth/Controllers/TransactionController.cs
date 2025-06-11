@@ -1,4 +1,5 @@
 ﻿using JwtAuth.Data;
+using JwtAuth.Entity.Enums;
 using JwtAuth.Models.JwtAuth.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -65,7 +66,7 @@ namespace JwtAuth.Controllers
                     QRCode = si.ProductItem.QR_Code,
                     SerialNumber = si.ProductItem.Serial_Number,
                     Status = si.ProductItem.Status,
-                    TransactionType = "StockIn",
+                    TransactionType = TransactionType.StockIn,
                     TransactionDate = si.ReceivedDate,
                     Username = si.User.Username
                 });
@@ -77,7 +78,7 @@ namespace JwtAuth.Controllers
                     QRCode = so.ProductItem.QR_Code,
                     SerialNumber = so.ProductItem.Serial_Number,
                     Status = so.ProductItem.Status,
-                    TransactionType = "StockOut",
+                    TransactionType = TransactionType.StockOut,
                     TransactionDate = so.SoldDate,
                     Username = so.User.Username
                 });

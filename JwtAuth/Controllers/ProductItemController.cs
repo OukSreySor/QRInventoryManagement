@@ -1,6 +1,8 @@
 ﻿using JwtAuth.Data;
 using JwtAuth.Entity;
+using JwtAuth.Entity.Enums;
 using JwtAuth.Models;
+using JwtAuth.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -20,11 +22,13 @@ namespace JwtAuth.Controllers
     {
         private readonly AppDbContext context;
         private readonly IWebHostEnvironment env;
+        private readonly ProductService productService;
 
-        public ProductItemController(AppDbContext context, IWebHostEnvironment env)
+        public ProductItemController(AppDbContext context, IWebHostEnvironment env, ProductService productService)
         {
             this.context = context;
             this.env = env;
+            this.productService = productService;
         }
 
         [HttpGet]
@@ -94,7 +98,7 @@ namespace JwtAuth.Controllers
             var productItem = new ProductItem
             {
                 Serial_Number = productItemDto.Serial_Number,
-                Status = productItemDto.Status,
+                Status = ProductItemStatus.PendingStockIn,
                 Manufacturing_Date = productItemDto.Manufacturing_Date,
                 Expiry_Date = productItemDto.Expiry_Date,
                 ProductId = productItemDto.ProductId,
@@ -105,6 +109,7 @@ namespace JwtAuth.Controllers
 
             context.ProductItems.Add(productItem);
             context.SaveChanges();
+            productService.UpdateProductStatus(productItem.ProductId);
 
             // Generate QR string (unique text identifier)
             var qrString = $"PIID-{productItem.Id}-SN-{productItem.Serial_Number}-PID-{productItem.ProductId}";
@@ -223,7 +228,6 @@ namespace JwtAuth.Controllers
             }
 
             productItem.Serial_Number = productItemDto.Serial_Number;
-            productItem.Status = productItemDto.Status;
             productItem.Manufacturing_Date = productItemDto.Manufacturing_Date;
             productItem.Expiry_Date = productItemDto.Expiry_Date;
             productItem.ProductId = productItemDto.ProductId;
@@ -255,8 +259,10 @@ namespace JwtAuth.Controllers
 
             context.ProductItems.Remove(item);
             context.SaveChanges();
+            productService.UpdateProductStatus(item.ProductId);
 
             return Ok("ProductItem delete success.");
         }
+
     }
 }

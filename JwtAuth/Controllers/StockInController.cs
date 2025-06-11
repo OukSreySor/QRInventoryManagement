@@ -1,6 +1,8 @@
 ﻿using JwtAuth.Data;
 using JwtAuth.Entity;
+using JwtAuth.Entity.Enums;
 using JwtAuth.Models;
+using JwtAuth.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -21,11 +23,13 @@ namespace JwtAuth.Controllers
     {
         private readonly AppDbContext context;
         private readonly IWebHostEnvironment env;
+        private readonly ProductService productService;
 
-        public StockInController(AppDbContext context, IWebHostEnvironment env)
+        public StockInController(AppDbContext context, IWebHostEnvironment env, ProductService productService)
         {
             this.context = context;
             this.env = env;
+            this.productService = productService;
         }
 
         [HttpPost("stock-in")]
@@ -43,11 +47,11 @@ namespace JwtAuth.Controllers
                 return Forbid("You are not allowed to stock in this product item.");
             }
 
-            if (productItem.Status == "InStock")
+            if (productItem.Status == ProductItemStatus.InStock)
                 return BadRequest("Product item already stocked in.");
 
             // Update item status to InStock
-            productItem.Status = "InStock";
+            productItem.Status = ProductItemStatus.InStock;
 
             // Create stock in record
             var stockIn = new StockIn
@@ -64,12 +68,14 @@ namespace JwtAuth.Controllers
             {
                 ProductItemId = stockInDto.ProductItemId,
                 UserId = userId,
-                TransactionType = "StockIn",
+                TransactionType = TransactionType.StockIn,
                 TransactionDate = stockInDto.ReceivedDate
             };
 
             context.Transactions.Add(transaction);
             context.SaveChanges();
+            productService.UpdateProductStatus(productItem.ProductId);
+
 
             return Ok(new 
             { 

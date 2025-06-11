@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel;
+using JwtAuth.Entity.Enums;
 using JwtAuth.Models;
 
 namespace JwtAuth.Entity
@@ -11,16 +12,15 @@ namespace JwtAuth.Entity
         public string? Image { get; set; }
         public decimal Unit_Price { get; set; }
         public decimal Selling_Price { get; set; }
-
+        public ProductStatus Status { get; set; }
         public int CategoryId { get; set; }
         public Category Category { get; set; } = null!;
 
         public Guid UserId { get; set; }
         public User User { get; set; } = null!;
 
-        public ICollection<ProductItem> ProductItems { get; set; } 
+        public ICollection<ProductItem> ProductItems { get; set; }
 
     }
-
 
 }
