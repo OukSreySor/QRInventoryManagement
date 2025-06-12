@@ -91,5 +91,68 @@ namespace JwtAuth.Controllers
             return Ok(allTransactions);
         }
 
+        [HttpGet("summary")]
+        public IActionResult GetSummary(DateTime? startDate, DateTime? endDate)
+        {
+            var userId = GetValidUserId();
+            var userRole = GetValidUserRole();
+
+            // Limit to user's items if role is User
+            var productItemsQuery = context.ProductItems.AsQueryable();
+            if (userRole == "User")
+            {
+                productItemsQuery = productItemsQuery.Where(pi => pi.UserId == userId);
+            }
+
+            // Count products by status
+            var totalInStock = productItemsQuery.Count(pi => pi.Status == ProductItemStatus.InStock);
+            var totalSold = productItemsQuery.Count(pi => pi.Status == ProductItemStatus.Sold);
+
+            // Base queries for transactions
+            var stockInsQuery = context.StockIns.AsQueryable();
+            var stockOutsQuery = context.StockOuts.AsQueryable();
+
+            if (userRole == "User")
+            {
+                stockInsQuery = stockInsQuery.Where(si => si.UserId == userId);
+                stockOutsQuery = stockOutsQuery.Where(so => so.UserId == userId);
+            }
+
+            if (startDate.HasValue)
+            {
+                stockInsQuery = stockInsQuery.Where(si => si.ReceivedDate >= startDate.Value);
+                stockOutsQuery = stockOutsQuery.Where(so => so.SoldDate >= startDate.Value);
+            }
+
+            if (endDate.HasValue)
+            {
+                stockInsQuery = stockInsQuery.Where(si => si.ReceivedDate <= endDate.Value);
+                stockOutsQuery = stockOutsQuery.Where(so => so.SoldDate <= endDate.Value);
+            }
+
+            var totalStockIns = stockInsQuery.Count();
+            var totalStockOuts = stockOutsQuery.Count();
+
+            // Recent activity - last 7 days transactions count
+            var recentStockIns = stockInsQuery
+                .Where(si => si.ReceivedDate >= DateTime.UtcNow.AddDays(-7))
+                .Count();
+
+            var recentStockOuts = stockOutsQuery
+                .Where(so => so.SoldDate >= DateTime.UtcNow.AddDays(-7))
+                .Count();
+
+            return Ok(new
+            {
+                TotalInStock = totalInStock,
+                TotalSold = totalSold,
+                TotalStockIns = totalStockIns,
+                TotalStockOuts = totalStockOuts,
+                RecentStockInsLast7Days = recentStockIns,
+                RecentStockOutsLast7Days = recentStockOuts
+            });
+        }
+
+
     }
 }
