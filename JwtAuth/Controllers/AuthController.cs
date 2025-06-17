@@ -10,6 +10,7 @@ using System.IdentityModel.Tokens.Jwt;
 using JwtAuth.Services;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using JwtAuth.Helpers;
 
 namespace JwtAuth.Controllers
 {
@@ -23,20 +24,19 @@ namespace JwtAuth.Controllers
         {
             var user = await authService.RegisterAsync(request);
             if (user == null)
-            {
-                return BadRequest("Username already exists.");
-            }
-            return Ok(user);
+                throw new ArgumentException("Username already exists.");
+
+            return Ok(new { success = true, data = user });
         }
 
         [HttpPost("login")]
         public async Task<ActionResult<TokenResponseDto>> Login(UserDto request)
         {
             var result = await authService.LoginAsync(request);
-                if (result == null)
-                    return BadRequest("Invalid username or password.");
+            if (result == null)
+                throw new UnauthorizedAccessException("Invalid username or password.");
 
-            return Ok(result);
+            return Ok(new { success = true, data = result });
         }
 
         [HttpPost("refresh-token")]
@@ -44,30 +44,30 @@ namespace JwtAuth.Controllers
         {
             var result = await authService.RefreshTokenAsync(request);
             if (result is null || result.AccessToken is null || result.RefreshToken is null)
-                return Unauthorized("Invalid refresh token.");
+                throw new UnauthorizedAccessException("Invalid refresh token.");
 
-            return Ok(result);
+            return Ok(new { success = true, data = result });
         }
 
         [Authorize]
         [HttpGet]
         public IActionResult AuthenticatedOnlyEndpoint()
         {
-            return Ok("You are authenticated.");
+            return Ok(new { success = true, message = "You are authenticated." });
         }
 
         [Authorize(Roles = "Admin")]
         [HttpGet("admin-only")]
         public IActionResult AdminOnlyEndpoint()
         {
-            return Ok("You are an admin.");
+            return Ok(new { success = true, message = "You are an admin." });
         }
 
         [Authorize(Roles = "User")]
         [HttpGet("user-only")]
         public IActionResult UserOnlyEndpoint()
         {
-            return Ok("You are a user.");
+            return Ok(new { success = true, message = "You are a user." });
         }
 
 

@@ -6,18 +6,18 @@ namespace JwtAuth.Services
 {
     public class ProductService
     {
-        private readonly AppDbContext context;
+        private readonly AppDbContext _context;
 
         public ProductService(AppDbContext context)
         {
-            this.context = context;
+            _context = context;
         }
 
-        public void UpdateProductStatus(int productId)
+        public async Task UpdateProductStatusAsync(int productId)
         {
-            var product = context.Products
+            var product = await _context.Products
                 .Include(p => p.ProductItems)
-                .FirstOrDefault(p => p.Id == productId);
+                .FirstOrDefaultAsync(p => p.Id == productId);
 
             if (product == null || product.Status == ProductStatus.Discontinued)
                 return;
@@ -25,7 +25,7 @@ namespace JwtAuth.Services
             int inStock = product.ProductItems.Count(pi => pi.Status == ProductItemStatus.InStock);
             product.Status = inStock == 0 ? ProductStatus.OutOfStock : ProductStatus.Available;
 
-            context.SaveChanges();
+            await _context.SaveChangesAsync();
         }
     }
 

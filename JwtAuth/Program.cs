@@ -1,5 +1,6 @@
 using System.Text;
 using JwtAuth.Data;
+using JwtAuth.Middlewares;
 using JwtAuth.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -84,6 +85,8 @@ app.UseHttpsRedirection();
 
 app.UseSwagger();
 app.UseSwaggerUI();
+
+app.UseMiddleware<ErrorHandlingMiddleware>();
 
 app.UseAuthentication();
 app.UseAuthorization();

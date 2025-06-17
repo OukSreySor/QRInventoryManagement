@@ -15,51 +15,51 @@ namespace JwtAuth.Controllers
     [Authorize(Roles = "Admin, User")]
     public class CategoryController : BaseController
     {
-        private readonly AppDbContext context;
+        private readonly AppDbContext _context;
            
             public CategoryController(AppDbContext context)
             {
-                this.context = context;
+                _context = context;
             }
 
             [HttpGet]
-            public IActionResult GetCategories()
+            public async Task<IActionResult> GetCategories()
             {
                 var userId = GetValidUserId();
                 var userRole = GetValidUserRole();
 
-                var categoriesQuery = context.Categories.AsQueryable();
+                var categoriesQuery = _context.Categories.AsQueryable();
 
                 if (userRole == "User")
                 {
                     categoriesQuery = categoriesQuery.Where(c => c.UserId == userId);
                 }
 
-                var categories = categoriesQuery
+                var categories = await categoriesQuery
                     .Select(c => new CategoryDto
                     {
                         Id = c.Id,
                         Name = c.Name,
                         Description = c.Description,
                         UserId = c.UserId  
-                    }).ToList();
+                    }).ToListAsync();
 
-            return Ok(categories);
+            return Ok(new { success = true, data = categories });
             }
 
             [HttpGet("{id}")]
-            public IActionResult GetCategory(int id)
+            public async Task<IActionResult> GetCategory(int id)
             {
                 var userId = GetValidUserId();
                 var userRole = GetValidUserRole();
 
-                var categoryQuery = context.Categories.Where(c => c.Id == id);
+                var categoryQuery = _context.Categories.Where(c => c.Id == id);
 
                 if (userRole == "User")
                 {
                     categoryQuery = categoryQuery.Where(c => c.UserId == userId);
                 }
-                var category = categoryQuery
+                var category = await categoryQuery
                     .Select(c => new CategoryDto
                 {
                     Id = c.Id,
@@ -67,19 +67,16 @@ namespace JwtAuth.Controllers
                     Description = c.Description,
                     UserId = c.UserId
                 })
-                .FirstOrDefault();
+                .FirstOrDefaultAsync();
 
                 if (category == null)
-                    {
-                        return NotFound("Category not found or access denied.");
-                    }
+                throw new KeyNotFoundException("Category not found or access denied.");
 
-                    return Ok(category);
-            
-                }
+            return Ok(new { success = true, data = category });
+            }
 
             [HttpPost]
-            public IActionResult CreateCategory(CategoryDto categoryDto)
+            public async Task<IActionResult> CreateCategory(CategoryDto categoryDto)
             {
                 var userId = GetValidUserId();
              
@@ -91,66 +88,66 @@ namespace JwtAuth.Controllers
                     CreatedAt = DateTime.Now
                 };
 
-                context.Categories.Add(category);
-                context.SaveChanges();
+                _context.Categories.Add(category);
+                await _context.SaveChangesAsync();
 
-                return Ok(category);
+                return Ok(new { success = true, data = category });
             }
 
             [HttpPut("{id}")]
-            public IActionResult EditCategory(int id, CategoryDto categoryDto)
+            public async Task<IActionResult> EditCategory(int id, CategoryDto categoryDto)
             {
                 var userId = GetValidUserId();
                 var userRole = GetValidUserRole();
 
-                var categoryQuery = context.Categories.Where(c => c.Id == id);
+                var categoryQuery = _context.Categories.Where(c => c.Id == id);
 
                 if (userRole == "User")
                 {
                     categoryQuery = categoryQuery.Where(c => c.UserId == userId);
                 }
-                var category = categoryQuery.FirstOrDefault();
+                var category = await categoryQuery.FirstOrDefaultAsync();
 
                 if (category == null)
                 {
-                    return NotFound("Category not found or access denied.");
-                }
+                throw new KeyNotFoundException("Category not found or access denied.");
+            }
 
                 category.Name = categoryDto.Name;
                 category.Description = categoryDto.Description;
                 category.UserId = userId;
                 category.UpdatedAt = DateTime.UtcNow;
 
-            context.SaveChanges();
-                return Ok("Category updated successfully.");
+                await _context.SaveChangesAsync();
+                return Ok(new { success = true, message = "Category updated successfully." });
             }
 
             [HttpDelete("{id}")]
-            public IActionResult DeleteCategory(int id)
+            public async Task<IActionResult> DeleteCategory(int id)
             {
                 var userId = GetValidUserId();
                 var userRole = GetValidUserRole();
 
-                var categoryQuery = context.Categories.Where(c => c.Id == id);
+                var categoryQuery = _context.Categories.Where(c => c.Id == id);
 
                 if (userRole == "User")
                 {
                     categoryQuery = categoryQuery.Where(c => c.UserId == userId);
                 }
 
-                var category = categoryQuery
+                var category = await categoryQuery
                     .Include(c => c.Products)
-                    .FirstOrDefault(c => c.Id == id && c.UserId == userId);
+                    .FirstOrDefaultAsync(c => c.Id == id);
 
                 if (category == null)
-                    return NotFound("Category not found or access denied.");
+                    throw new KeyNotFoundException("Category not found or access denied.");
 
                 if (category.Products.Any())
-                    return BadRequest("Cannot delete a category that has products.");
+                throw new ArgumentException("Cannot delete a category that has products.");
 
-                context.Categories.Remove(category);
-                context.SaveChanges();
-                return Ok("Category deleted successfully.");
+            _context.Categories.Remove(category);
+                await _context.SaveChangesAsync();
+                return Ok(new { success = true, message = "Category deleted successfully." });
             }
         }
     }

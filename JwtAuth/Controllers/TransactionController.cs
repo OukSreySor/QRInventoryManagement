@@ -1,4 +1,5 @@
 ﻿using JwtAuth.Data;
+using JwtAuth.Entity;
 using JwtAuth.Entity.Enums;
 using JwtAuth.Models.JwtAuth.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -13,24 +14,24 @@ namespace JwtAuth.Controllers
     [Authorize(Roles = "Admin, User")]
     public class TransactionController : BaseController
     {
-        private readonly AppDbContext context;
+        private readonly AppDbContext _context;
         public TransactionController(AppDbContext context)
         {
-            this.context = context;
+            _context = context;
         }
 
         [HttpGet("transactions")]
-        public IActionResult GetTransactions(DateTime? startDate, DateTime? endDate, string? username)
+        public async Task<IActionResult> GetTransactions(DateTime? startDate, DateTime? endDate, string? username)
         {
             var userId = GetValidUserId();
             var userRole = GetValidUserRole();
 
-            var stockInsQuery = context.StockIns
+            var stockInsQuery = _context.StockIns
                 .Include(si => si.ProductItem)
                 .Include(si => si.User)
                 .AsQueryable();
 
-            var stockOutsQuery = context.StockOuts
+            var stockOutsQuery = _context.StockOuts
                 .Include(so => so.ProductItem)
                 .Include(so => so.User)
                 .AsQueryable();
@@ -83,34 +84,34 @@ namespace JwtAuth.Controllers
                     Username = so.User.Username
                 });
 
-            var allTransactions = stockIns
+            var allTransactions = await stockIns
                 .Union(stockOuts)
                 .OrderByDescending(t => t.TransactionDate)
-                .ToList();
+            .ToListAsync();
 
-            return Ok(allTransactions);
+            return Ok(new { success = true, data = allTransactions });
         }
 
         [HttpGet("summary")]
-        public IActionResult GetSummary(DateTime? startDate, DateTime? endDate)
+        public async Task<IActionResult> GetSummary(DateTime? startDate, DateTime? endDate)
         {
             var userId = GetValidUserId();
             var userRole = GetValidUserRole();
 
             // Limit to user's items if role is User
-            var productItemsQuery = context.ProductItems.AsQueryable();
+            var productItemsQuery = _context.ProductItems.AsQueryable();
             if (userRole == "User")
             {
                 productItemsQuery = productItemsQuery.Where(pi => pi.UserId == userId);
             }
 
             // Count products by status
-            var totalInStock = productItemsQuery.Count(pi => pi.Status == ProductItemStatus.InStock);
-            var totalSold = productItemsQuery.Count(pi => pi.Status == ProductItemStatus.Sold);
+            var totalInStock = await productItemsQuery.CountAsync(pi => pi.Status == ProductItemStatus.InStock);
+            var totalSold = await productItemsQuery.CountAsync(pi => pi.Status == ProductItemStatus.Sold);
 
             // Base queries for transactions
-            var stockInsQuery = context.StockIns.AsQueryable();
-            var stockOutsQuery = context.StockOuts.AsQueryable();
+            var stockInsQuery = _context.StockIns.AsQueryable();
+            var stockOutsQuery = _context.StockOuts.AsQueryable();
 
             if (userRole == "User")
             {
@@ -130,20 +131,21 @@ namespace JwtAuth.Controllers
                 stockOutsQuery = stockOutsQuery.Where(so => so.SoldDate <= endDate.Value);
             }
 
-            var totalStockIns = stockInsQuery.Count();
-            var totalStockOuts = stockOutsQuery.Count();
+            var totalStockIns = await stockInsQuery.CountAsync();
+            var totalStockOuts = await stockOutsQuery.CountAsync();
 
             // Recent activity - last 7 days transactions count
-            var recentStockIns = stockInsQuery
+            var recentStockIns = await stockInsQuery
                 .Where(si => si.ReceivedDate >= DateTime.UtcNow.AddDays(-7))
-                .Count();
+                .CountAsync();
 
-            var recentStockOuts = stockOutsQuery
+            var recentStockOuts = await stockOutsQuery
                 .Where(so => so.SoldDate >= DateTime.UtcNow.AddDays(-7))
-                .Count();
+                .CountAsync();
 
             return Ok(new
             {
+                success = true,
                 TotalInStock = totalInStock,
                 TotalSold = totalSold,
                 TotalStockIns = totalStockIns,

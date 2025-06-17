@@ -1,6 +1,7 @@
 ﻿using JwtAuth.Data;
 using JwtAuth.Entity;
 using JwtAuth.Entity.Enums;
+using JwtAuth.Helpers;
 using JwtAuth.Models;
 using JwtAuth.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -21,34 +22,32 @@ namespace JwtAuth.Controllers
     [Authorize(Roles = "Admin, User")]
     public class StockInController : BaseController
     {
-        private readonly AppDbContext context;
-        private readonly IWebHostEnvironment env;
-        private readonly ProductService productService;
+        private readonly AppDbContext _context;
+        private readonly IWebHostEnvironment _env;
+        private readonly ProductService _productService;
 
         public StockInController(AppDbContext context, IWebHostEnvironment env, ProductService productService)
         {
-            this.context = context;
-            this.env = env;
-            this.productService = productService;
+            _context = context;
+            _env = env;
+            _productService = productService;
         }
 
         [HttpPost("stock-in")]
-        public IActionResult StockIn(StockInDto stockInDto)
+        public async Task<IActionResult> StockIn(StockInDto stockInDto)
         {
             var userId = GetValidUserId();
             var userRole = GetValidUserRole();
 
-            var productItem = context.ProductItems.FirstOrDefault(pi => pi.Id == stockInDto.ProductItemId);
+            var productItem = await _context.ProductItems.FirstOrDefaultAsync(pi => pi.Id == stockInDto.ProductItemId);
             if (productItem == null)
-                return NotFound($"ProductItem with Id {stockInDto.ProductItemId} not found.");
+                throw new KeyNotFoundException($"ProductItem with Id {stockInDto.ProductItemId} not found.");
 
             if (userRole == "User" && productItem.UserId != userId)
-            {
-                return Forbid("You are not allowed to stock in this product item.");
-            }
+                throw new UnauthorizedAccessException("You are not allowed to stock in this product item.");
 
             if (productItem.Status == ProductItemStatus.InStock)
-                return BadRequest("Product item already stocked in.");
+                throw new ArgumentException("Product item already stocked in.");
 
             // Update item status to InStock
             productItem.Status = ProductItemStatus.InStock;
@@ -61,7 +60,7 @@ namespace JwtAuth.Controllers
                 ReceivedDate = stockInDto.ReceivedDate
             };
 
-            context.StockIns.Add(stockIn);
+            await _context.StockIns.AddAsync(stockIn);
 
             // Transaction Record
             var transaction = new Transaction
@@ -72,15 +71,11 @@ namespace JwtAuth.Controllers
                 TransactionDate = stockInDto.ReceivedDate
             };
 
-            context.Transactions.Add(transaction);
-            context.SaveChanges();
-            productService.UpdateProductStatus(productItem.ProductId);
+            await _context.Transactions.AddAsync(transaction);
+            await _context.SaveChangesAsync();
+            await _productService.UpdateProductStatusAsync(productItem.ProductId);
 
-
-            return Ok(new 
-            { 
-                message = "Stock in recorded successfully."
-            });
+            return Ok(new { success = true, message = "Stock in recorded successfully."} );
         }
 
     }

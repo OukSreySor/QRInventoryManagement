@@ -1,6 +1,7 @@
 ﻿using JwtAuth.Data;
 using JwtAuth.Entity;
 using JwtAuth.Entity.Enums;
+using JwtAuth.Helpers;
 using JwtAuth.Models;
 using JwtAuth.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -20,31 +21,31 @@ namespace JwtAuth.Controllers
     [Authorize(Roles = "Admin, User")]
     public class ProductItemController : BaseController
     {
-        private readonly AppDbContext context;
-        private readonly IWebHostEnvironment env;
-        private readonly ProductService productService;
+        private readonly AppDbContext _context;
+        private readonly IWebHostEnvironment _env;
+        private readonly ProductService _productService;
 
         public ProductItemController(AppDbContext context, IWebHostEnvironment env, ProductService productService)
         {
-            this.context = context;
-            this.env = env;
-            this.productService = productService;
+            _context = context;
+            _env = env;
+            _productService = productService;
         }
 
         [HttpGet]
-        public IActionResult GetProductItems()
+        public async Task<IActionResult> GetProductItems()
         {
             var userId = GetValidUserId();
             var userRole = GetValidUserRole();
 
-            var productItemsQuery = context.ProductItems.AsQueryable();
+            var productItemsQuery = _context.ProductItems.AsQueryable();
 
             if (userRole == "User")
             {
                 productItemsQuery = productItemsQuery.Where(pi => pi.UserId == userId);
             }
 
-            var productItems = productItemsQuery
+            var productItems = await productItemsQuery
                 .Select(pi => new ProductItemDto
                 {
                     Id = pi.Id,
@@ -53,23 +54,23 @@ namespace JwtAuth.Controllers
                     Status = pi.Status,
                     ProductId = pi.ProductId,
                     UserId = pi.UserId
-                }).ToList();
-            return Ok(productItems);
+                }).ToListAsync();
+            return Ok(new { success = true, data = productItems });
         }
 
         [HttpGet("{id}")]
-        public IActionResult GetProductItem(int id)
+        public async Task<IActionResult> GetProductItem(int id)
         {
             var userId = GetValidUserId();
             var userRole = GetValidUserRole();
 
-            var productItemQuery = context.ProductItems.Where(pi => pi.Id == id);
+            var productItemQuery = _context.ProductItems.Where(pi => pi.Id == id);
 
             if (userRole == "User")
             {
                 productItemQuery = productItemQuery.Where(pi => pi.UserId == userId);
             }
-            var productItem = productItemQuery
+            var productItem = await productItemQuery
                 .Select(pi => new ProductItemDto
                 {
                     Id = pi.Id,
@@ -78,23 +79,22 @@ namespace JwtAuth.Controllers
                     Status = pi.Status,
                     ProductId = pi.ProductId,
                     UserId = pi.UserId
-                }).FirstOrDefault();
+                }).FirstOrDefaultAsync();
 
-            if (productItem == null) return NotFound();
+            if (productItem == null)
+                throw new KeyNotFoundException("Product item not found.");
 
-            return Ok(productItem);
+            return Ok(new { success = true, data = productItem });
         }
 
         [HttpPost]
-        public IActionResult CreateProductItem(ProductItemDto productItemDto)
+        public async Task<IActionResult> CreateProductItem(ProductItemDto productItemDto)
         {
             var userId = GetValidUserId();
-            var productExists = context.Products.Any(p => p.Id == productItemDto.ProductId && p.UserId == userId);
+            var productExists = await _context.Products.AnyAsync(p => p.Id == productItemDto.ProductId && p.UserId == userId);
             if (!productExists)
-            {
-                return BadRequest("Invalid ProductId. Product does not exist.");
-            }
-
+                throw new ArgumentException("Invalid ProductId. Product does not exist.");
+            
             var productItem = new ProductItem
             {
                 Serial_Number = productItemDto.Serial_Number,
@@ -107,23 +107,23 @@ namespace JwtAuth.Controllers
                 UpdatedAt = DateTime.UtcNow
             };
 
-            context.ProductItems.Add(productItem);
-            context.SaveChanges();
-            productService.UpdateProductStatus(productItem.ProductId);
+            await _context.ProductItems.AddAsync(productItem);
+            await _context.SaveChangesAsync();
+            await _productService.UpdateProductStatusAsync(productItem.ProductId);
 
             // Generate QR string (unique text identifier)
             var qrString = $"PIID-{productItem.Id}-SN-{productItem.Serial_Number}-PID-{productItem.ProductId}";
 
             // Save QR string to product item
             productItem.QR_Code = qrString;
-            context.SaveChanges();
+            await _context.SaveChangesAsync();
 
             var qrGenerator = new QRCodeGenerator();
             var qrCodeData = qrGenerator.CreateQrCode(qrString, QRCodeGenerator.ECCLevel.Q);
             var qrCode = new PngByteQRCode(qrCodeData);
             var qrBytes = qrCode.GetGraphic(15); 
 
-            var qrFolder = Path.Combine(env.WebRootPath ?? "wwwroot", "qrcodes");
+            var qrFolder = Path.Combine(_env.WebRootPath ?? "wwwroot", "qrcodes");
             if (!Directory.Exists(qrFolder))
                 Directory.CreateDirectory(qrFolder);
 
@@ -150,11 +150,11 @@ namespace JwtAuth.Controllers
                 QRImageUrl = qrImageUrl
             };
 
-            return Ok(result);
+            return Ok(new { success = true, data = result });
 
         }
         [HttpGet("scan")]
-        public IActionResult ScanProductItem(string code)
+        public async Task<IActionResult> ScanProductItem(string code)
         {
             var userId = GetValidUserId();
 
@@ -162,16 +162,16 @@ namespace JwtAuth.Controllers
             var parts = code.Split('-');
 
             if (parts.Length != 6 || parts[0] != "PIID" || parts[2] != "SN" || parts[4] != "PID")
-                return BadRequest("Invalid QR code format.");
+                throw new ArgumentException("Invalid QR code format.");
 
             if (!int.TryParse(parts[1], out int productItemId) || !int.TryParse(parts[5], out int productId))
-                return BadRequest("Invalid ID values in QR code.");
+                throw new ArgumentException("Invalid ID values in QR code.");
 
             var serialNumber = parts[3];
 
-            var productItem = context.ProductItems
+            var productItem = await _context.ProductItems
                 .Include(pi => pi.Product) 
-                .FirstOrDefault(pi =>
+                .FirstOrDefaultAsync(pi =>
                     pi.Id == productItemId &&
                     pi.Serial_Number == serialNumber &&
                     pi.ProductId == productId &&
@@ -179,7 +179,7 @@ namespace JwtAuth.Controllers
                 );
 
             if (productItem == null)
-                return NotFound("Product item not found.");
+                throw new KeyNotFoundException("Product item not found.");
 
             var result = new
             {
@@ -199,15 +199,15 @@ namespace JwtAuth.Controllers
                 }
             };
 
-            return Ok(result);
+            return Ok(new { success = true, data = result });
         }
         [HttpPut("{id}")]
-        public IActionResult EditProductItem(int id, ProductItemDto productItemDto)
+        public async Task<IActionResult> EditProductItem(int id, ProductItemDto productItemDto)
         {
             var userId = GetValidUserId();
             var userRole = GetValidUserRole();
 
-            var productItemQuery = context.ProductItems.Where(pi => pi.Id == id);
+            var productItemQuery = _context.ProductItems.Where(pi => pi.Id == id);
 
             if (userRole == "User")
             {
@@ -216,16 +216,12 @@ namespace JwtAuth.Controllers
 
             var productItem = productItemQuery.FirstOrDefault();
             if (productItem == null)
-            {
-                return NotFound();
-            }
+                throw new KeyNotFoundException("Product item not found.");
 
-            var productExists = context.Products.Any(p => p.Id == productItemDto.ProductId &&
+            var productExists = await _context.Products.AnyAsync(p => p.Id == productItemDto.ProductId &&
                                               (userRole == "Admin" || p.UserId == userId));
             if (!productExists)
-            {
-                return BadRequest("Invalid ProductId or access denied.");
-            }
+                throw new ArgumentException("Invalid ProductId or access denied.");
 
             productItem.Serial_Number = productItemDto.Serial_Number;
             productItem.Manufacturing_Date = productItemDto.Manufacturing_Date;
@@ -233,35 +229,33 @@ namespace JwtAuth.Controllers
             productItem.ProductId = productItemDto.ProductId;
             productItem.UpdatedAt = DateTime.UtcNow;
 
-            context.SaveChanges();
+            await _context.SaveChangesAsync();
 
-            return Ok(productItem);
+            return Ok(new { success = true, data = productItem });
         }
 
         [HttpDelete("{id}")]
-        public IActionResult DeleteProductItem(int id)
+        public async Task<IActionResult> DeleteProductItem(int id)
         {
             var userId = GetValidUserId();
             var userRole = GetValidUserRole();
 
-            var productItemQuery = context.ProductItems.Where(pi => pi.Id == id);
+            var productItemQuery = _context.ProductItems.Where(pi => pi.Id == id);
 
             if (userRole == "User")
             {
                 productItemQuery = productItemQuery.Where(pi => pi.UserId == userId);
             }
 
-            var item = productItemQuery.FirstOrDefault();
+            var item = await productItemQuery.FirstOrDefaultAsync();
             if (item == null)
-            {
-                return NotFound("ProductItem not found.");
-            }
+                throw new KeyNotFoundException("Product item not found.");
 
-            context.ProductItems.Remove(item);
-            context.SaveChanges();
-            productService.UpdateProductStatus(item.ProductId);
+            _context.ProductItems.Remove(item);
+            await _context.SaveChangesAsync();
+            await _productService.UpdateProductStatusAsync(item.ProductId);
 
-            return Ok("ProductItem delete success.");
+            return Ok(new { success = true, message = "Product item deleted successfully." });
         }
 
     }

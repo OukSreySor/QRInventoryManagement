@@ -1,6 +1,7 @@
 ﻿using JwtAuth.Data;
 using JwtAuth.Entity;
 using JwtAuth.Entity.Enums;
+using JwtAuth.Helpers;
 using JwtAuth.Models;
 using JwtAuth.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -15,22 +16,22 @@ namespace JwtAuth.Controllers
     [Authorize(Roles = "Admin, User")]
     public class ProductController : BaseController
     {
-        private readonly AppDbContext context;
-        private readonly ProductService productService;
+        private readonly AppDbContext _context;
+        private readonly ProductService _productService;
         public ProductController(AppDbContext context, ProductService productService)
         {
-            this.context = context;
-            this.productService = productService;
+            _context = context;
+            _productService = productService;
         }
 
         [HttpGet]
-        public IActionResult GetProducts()
+        public async Task<IActionResult> GetProducts()
         {
             var userId = GetValidUserId();
             var userRole = GetValidUserRole();
 
             // Start building the query
-            var productsQuery = context.Products
+            var productsQuery = _context.Products
                 .Include(p => p.ProductItems)
                 .AsQueryable();
 
@@ -40,7 +41,7 @@ namespace JwtAuth.Controllers
                 productsQuery = productsQuery.Where(p => p.UserId == userId);
             }
 
-            var products = productsQuery
+            var products = await productsQuery
             .Select(p => new ProductDto
             {
                 Id = p.Id,
@@ -63,18 +64,18 @@ namespace JwtAuth.Controllers
                     UserId = pi.UserId
 
                 }).ToList()
-            }).ToList();
+            }).ToListAsync();
 
-            return Ok(products);
+            return Ok(new { success = true, data = products });
         }
 
         [HttpGet("{id}")]
-        public IActionResult GetProduct(int id)
+        public async Task<IActionResult> GetProduct(int id)
         {
             var userId = GetValidUserId();
             var userRole = GetValidUserRole();
 
-            var productQuery = context.Products
+            var productQuery = _context.Products
                 .Include(p => p.ProductItems)
                 .Where(p => p.Id == id);
 
@@ -82,7 +83,7 @@ namespace JwtAuth.Controllers
             {
                 productQuery = productQuery.Where(p => p.UserId == userId);
             }
-            var product = productQuery
+            var product = await productQuery
                 .Select(p => new ProductDto
                 {
                     Id = p.Id,
@@ -105,23 +106,21 @@ namespace JwtAuth.Controllers
                             ProductId = pi.ProductId,
                             UserId = pi.UserId
                         }).ToList()
-                }).FirstOrDefault();
+                }).FirstOrDefaultAsync();
 
             if (product == null)
-            {
-                return NotFound();
-            }
+                throw new KeyNotFoundException("Product not found or access denied.");
 
-            return Ok(product);
+            return Ok(new { success = true, data = product });
         }
         [HttpPost]
-        public IActionResult CreateProduct(ProductDto productDto)
+        public async Task<IActionResult> CreateProduct(ProductDto productDto)
         {
-            var categoryExists = context.Categories.Any(c => c.Id == productDto.CategoryId);
+            var categoryExists = await _context.Categories.AnyAsync(c => c.Id == productDto.CategoryId);
             var userId = GetValidUserId();
             
             if (!categoryExists)
-                return BadRequest("Invalid CategoryId.");
+                throw new ArgumentException("Invalid category. Please select a valid category.");
 
             var product = new Product
             {
@@ -135,31 +134,29 @@ namespace JwtAuth.Controllers
                 CreatedAt = DateTime.Now,
             };
 
-            context.Products.Add(product);
-            context.SaveChanges();
-            productService.UpdateProductStatus(product.Id);
-            return Ok(product);
+            _context.Products.Add(product);
+            await _context.SaveChangesAsync();
+            await _productService.UpdateProductStatusAsync(product.Id);
+            return Ok(new { success = true, data = product });
 
         }
         [HttpPut("{id}")]
-        public IActionResult EditProduct(int id, ProductDto productDto)
+        public async Task<IActionResult> EditProduct(int id, ProductDto productDto)
         {
             var userId = GetValidUserId();
             var userRole = GetValidUserRole();
 
-            var productQuery = context.Products.Where(p => p.Id == id);
+            var productQuery = _context.Products.Where(p => p.Id == id);
 
             if(userRole == "User")
             {
                 productQuery = productQuery.Where(p => p.UserId == userId);
             }
 
-            var product = productQuery.FirstOrDefault();
+            var product = await productQuery.FirstOrDefaultAsync();
 
             if (product == null)
-            {
-                return NotFound();
-            }
+                throw new KeyNotFoundException("Product not found or access denied.");
 
             product.Name = productDto.Name;
             product.Description = productDto.Description;
@@ -173,35 +170,33 @@ namespace JwtAuth.Controllers
             }
             product.UpdatedAt = DateTime.UtcNow;
 
-            context.SaveChanges();
+            await _context.SaveChangesAsync();
 
-            return Ok(product);
+            return Ok(new { success = true, message = "Product updated successfully." });
 
         }
 
         [HttpDelete("{id}")]
-        public IActionResult DeleteProduct(int id) 
+        public async Task<IActionResult> DeleteProduct(int id) 
         {
             var userId = GetValidUserId();
             var userRole = GetValidUserRole();
 
-            var productQuery = context.Products.Where(p => p.Id == id);
+            var productQuery = _context.Products.Where(p => p.Id == id);
 
             if (userRole == "User")
             {
                 productQuery = productQuery.Where(p => p.UserId == userId);
             }
 
-            var product = productQuery.FirstOrDefault();
+            var product = await productQuery.FirstOrDefaultAsync();
             if (product == null)
-            {
-                return NotFound();
-            }
+                throw new KeyNotFoundException("Product not found or access denied.");
 
-            context.Products.Remove(product);
-            context.SaveChanges();
+            _context.Products.Remove(product);
+            await _context.SaveChangesAsync();
 
-            return Ok("Product delete success.");
+            return Ok(new { success = true, message = "Product deleted successfully." });
             
                 
         }

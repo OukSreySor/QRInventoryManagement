@@ -1,4 +1,5 @@
 ﻿using JwtAuth.Data;
+using JwtAuth.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -11,74 +12,83 @@ namespace JwtAuth.Controllers
     [Authorize(Roles = "Admin")]
     public class AdminController : ControllerBase
     {
-        private readonly AppDbContext context;
+        private readonly AppDbContext _context;
 
         public AdminController(AppDbContext context)
         {
-            this.context = context;
+            _context = context;
         }
         [HttpGet("users")]
-        public IActionResult GetAllUsers()
+        public async Task<IActionResult> GetAllUsers()
         {
-            var users = context.Users
+            var users = await _context.Users
                 .Select(u => new
                 {
                     u.Id,
                     u.Username,
                     u.Role,
                     u.CreatedAt,
-                }).ToList();
-            return Ok(users);
+                }).ToListAsync();
+            return Ok( new { success = true, data = users });
         }
         [HttpGet("users/{id}")]
-        public IActionResult GetUserById(Guid id)
+        public async Task<IActionResult> GetUserById(Guid id)
         {
-            var user = context.Users.FirstOrDefault(u => u.Id == id);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == id);
             if (user == null)
-                return NotFound();
+                throw new KeyNotFoundException("User not found");
 
             return Ok(new
             {
-                user.Id,
-                user.Username,
-                user.Role,
-                user.CreatedAt
+                success = true,
+                data = new 
+                {
+                    user.Id,
+                    user.Username,
+                    user.Role,
+                    user.CreatedAt
+                }
+                
             });
         }
         [HttpPut("users/{id}")]
-        public IActionResult UpdateUserRole(Guid id, UpdateUserRoleDto updateDto)
+        public async Task<IActionResult> UpdateUserRole(Guid id, UpdateUserRoleDto updateDto)
         {
             if (id != updateDto.UserId)
-                return BadRequest("ID does not match!");
+                throw new ArgumentException("ID does not match");
 
-            var user = context.Users.FirstOrDefault(u => u.Id == id);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == id);
             if (user == null)
-                return NotFound();
+                throw new KeyNotFoundException("User not found");
 
             if (updateDto.NewRole != "Admin" && updateDto.NewRole != "User")
-                return BadRequest("Invalid role. Only 'Admin' or 'User' allowed.");
+                throw new ArgumentException("Invalid role. Only 'Admin' or 'User' allowed.");
 
             user.Role = updateDto.NewRole;
-            context.SaveChanges();
+            await _context.SaveChangesAsync();
 
             return Ok(new
             {
-                user.Id,
-                user.Username,
-                user.Role
+                success = true,
+                data = new
+                {
+                    user.Id,
+                    user.Username,
+                    user.Role
+                }
             });
         }
         [HttpDelete("users/{id}")]
-        public IActionResult DeleteUser(Guid id)
+        public async Task<IActionResult> DeleteUser(Guid id)
         {
-            var user = context.Users.FirstOrDefault(u => u.Id == id);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == id);
             if (user == null)
-                return NotFound();
+                throw new KeyNotFoundException("User not found");
 
-            context.Users.Remove(user);
-            context.SaveChanges();
+            _context.Users.Remove(user);
+            await _context.SaveChangesAsync();
 
-            return Ok("User deleted successfully.");
+            return Ok(new { success = true, message = "User deleted successfully." });
         }
     }
 
