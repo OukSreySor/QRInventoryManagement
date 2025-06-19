@@ -64,6 +64,9 @@ namespace JwtAuth.Controllers
             var userId = GetValidUserId();
             var userRole = GetValidUserRole();
 
+            if (id <= 0)
+                throw new ArgumentException("Invalid product item ID.");
+
             var productItemQuery = _context.ProductItems.Where(pi => pi.Id == id);
 
             if (userRole == "User")
@@ -91,10 +94,43 @@ namespace JwtAuth.Controllers
         public async Task<IActionResult> CreateProductItem(ProductItemDto productItemDto)
         {
             var userId = GetValidUserId();
-            var productExists = await _context.Products.AnyAsync(p => p.Id == productItemDto.ProductId && p.UserId == userId);
+            var userRole = GetValidUserRole();
+
+            bool productExists;
+            if (userRole == "User")
+            {
+                productExists = await _context.Products
+                    .AnyAsync(p => p.Id == productItemDto.ProductId && p.UserId == userId);
+            }
+            else if (userRole == "Admin")
+            {
+                productExists = await _context.Products
+                    .AnyAsync(p => p.Id == productItemDto.ProductId);
+            }
+            else
+            {
+                throw new UnauthorizedAccessException("Invalid user role.");
+            }
+
             if (!productExists)
-                throw new ArgumentException("Invalid ProductId. Product does not exist.");
+                throw new ArgumentException("Invalid ProductId or access denied.");
             
+            var isDuplicateSerial = await _context.ProductItems
+                 .AnyAsync(p => p.Serial_Number == productItemDto.Serial_Number &&
+                                p.ProductId == productItemDto.ProductId);
+
+            if (isDuplicateSerial)
+                throw new ArgumentException("Duplicate serial number within the same product.");
+
+            if (productItemDto.Manufacturing_Date > productItemDto.Expiry_Date)
+                throw new ArgumentException("Expiry date must be after manufacturing date.");
+
+            if (productItemDto.Expiry_Date <= DateTime.UtcNow)
+                throw new ArgumentException("Expiry date must be a future date.");
+
+            if (productItemDto.Manufacturing_Date > DateTime.UtcNow)
+                throw new ArgumentException("Manufacturing date cannot be in the future.");
+
             var productItem = new ProductItem
             {
                 Serial_Number = productItemDto.Serial_Number,
@@ -207,6 +243,9 @@ namespace JwtAuth.Controllers
             var userId = GetValidUserId();
             var userRole = GetValidUserRole();
 
+            if (id <= 0)
+                throw new ArgumentException("Invalid product item ID.");
+
             var productItemQuery = _context.ProductItems.Where(pi => pi.Id == id);
 
             if (userRole == "User")
@@ -214,7 +253,7 @@ namespace JwtAuth.Controllers
                 productItemQuery = productItemQuery.Where(pi => pi.UserId == userId);
             }
 
-            var productItem = productItemQuery.FirstOrDefault();
+            var productItem = await productItemQuery.FirstOrDefaultAsync();
             if (productItem == null)
                 throw new KeyNotFoundException("Product item not found.");
 
@@ -222,6 +261,25 @@ namespace JwtAuth.Controllers
                                               (userRole == "Admin" || p.UserId == userId));
             if (!productExists)
                 throw new ArgumentException("Invalid ProductId or access denied.");
+
+            if (productItemDto.ProductId <= 0)
+                throw new ArgumentException("Product ID must be a positive number.");
+
+            var isDuplicateSerial = await _context.ProductItems.AnyAsync(p =>
+                p.Id != id &&
+                p.Serial_Number == productItemDto.Serial_Number &&
+                p.ProductId == productItemDto.ProductId);
+            if (isDuplicateSerial)
+                throw new ArgumentException("Duplicate serial number within the same product.");
+
+            if (productItemDto.Manufacturing_Date > productItemDto.Expiry_Date)
+                throw new ArgumentException("Expiry date must be after manufacturing date.");
+
+            if (productItemDto.Expiry_Date <= DateTime.UtcNow)
+                throw new ArgumentException("Expiry date must be a future date.");
+
+            if (productItemDto.Manufacturing_Date > DateTime.UtcNow)
+                throw new ArgumentException("Manufacturing date cannot be in the future.");
 
             productItem.Serial_Number = productItemDto.Serial_Number;
             productItem.Manufacturing_Date = productItemDto.Manufacturing_Date;

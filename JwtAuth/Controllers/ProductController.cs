@@ -83,6 +83,10 @@ namespace JwtAuth.Controllers
             {
                 productQuery = productQuery.Where(p => p.UserId == userId);
             }
+
+            if (id <= 0)
+                throw new ArgumentException("Invalid product ID.");
+
             var product = await productQuery
                 .Select(p => new ProductDto
                 {
@@ -116,11 +120,39 @@ namespace JwtAuth.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateProduct(ProductDto productDto)
         {
-            var categoryExists = await _context.Categories.AnyAsync(c => c.Id == productDto.CategoryId);
             var userId = GetValidUserId();
-            
+            var userRole = GetValidUserRole();
+
+            bool categoryExists;
+            if (userRole == "User")
+            {
+                categoryExists = await _context.Categories
+                    .AnyAsync(c => c.Id == productDto.CategoryId && c.UserId == userId);
+            }
+            else if (userRole == "Admin")
+            {
+                categoryExists = await _context.Categories
+                    .AnyAsync(c => c.Id == productDto.CategoryId);
+            }
+            else
+            {
+                throw new UnauthorizedAccessException("Invalid user role.");
+            }
+
             if (!categoryExists)
-                throw new ArgumentException("Invalid category. Please select a valid category.");
+                throw new ArgumentException("Invalid CategoryId or access denied.");
+            
+            if (productDto.Unit_Price <= 0)
+                throw new ArgumentException("Unit price must be a positive number.");
+
+            if (productDto.Selling_Price < productDto.Unit_Price)
+                throw new ArgumentException("Selling price must be greater than or equal to unit price.");
+
+            var isDuplicate = await _context.Products.AnyAsync(p =>
+                p.Name == productDto.Name.Trim() && p.UserId == userId);
+
+            if (isDuplicate)
+                throw new ArgumentException("Product with the same name already exists.");
 
             var product = new Product
             {
@@ -153,10 +185,43 @@ namespace JwtAuth.Controllers
                 productQuery = productQuery.Where(p => p.UserId == userId);
             }
 
+            if (id <= 0)
+                throw new ArgumentException("Invalid product ID.");
+
+            // Category validation based on role
+            if (userRole == "User")
+            {
+                var categoryExists = await _context.Categories
+                    .AnyAsync(c => c.Id == productDto.CategoryId && c.UserId == userId);
+
+                if (!categoryExists)
+                    throw new UnauthorizedAccessException("Invalid CategoryId or access denied.");
+            }
+            else if (userRole == "Admin")
+            {
+                var categoryExists = await _context.Categories
+                    .AnyAsync(c => c.Id == productDto.CategoryId);
+
+                if (!categoryExists)
+                    throw new ArgumentException("Invalid category. Please select a valid category.");
+            }
+
             var product = await productQuery.FirstOrDefaultAsync();
 
             if (product == null)
                 throw new KeyNotFoundException("Product not found or access denied.");
+
+            if (productDto.Unit_Price <= 0)
+                throw new ArgumentException("Unit price must be a positive number.");
+
+            if (productDto.Selling_Price < productDto.Unit_Price)
+                throw new ArgumentException("Selling price must be greater than or equal to unit price.");
+
+            var isDuplicate = await _context.Products.AnyAsync(p =>
+                p.Name == productDto.Name.Trim() && p.UserId == userId && p.Id != id);
+
+            if (isDuplicate)
+                throw new ArgumentException("Product with the same name already exists.");
 
             product.Name = productDto.Name;
             product.Description = productDto.Description;
@@ -188,17 +253,21 @@ namespace JwtAuth.Controllers
             {
                 productQuery = productQuery.Where(p => p.UserId == userId);
             }
+            if (id <= 0)
+                throw new ArgumentException("Invalid product ID.");
 
             var product = await productQuery.FirstOrDefaultAsync();
             if (product == null)
                 throw new KeyNotFoundException("Product not found or access denied.");
 
+            var hasItems = await _context.ProductItems.AnyAsync(pi => pi.ProductId == product.Id);
+            if (hasItems)
+                throw new InvalidOperationException("Cannot delete product with existing stock items.");
+
             _context.Products.Remove(product);
             await _context.SaveChangesAsync();
 
-            return Ok(new { success = true, message = "Product deleted successfully." });
-            
-                
+            return Ok(new { success = true, message = "Product deleted successfully." });      
         }
     }
 }

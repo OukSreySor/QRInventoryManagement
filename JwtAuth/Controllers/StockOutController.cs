@@ -42,6 +42,28 @@ namespace JwtAuth.Controllers
             if (productItem.Status != ProductItemStatus.InStock)
                 throw new ArgumentException("ProductItem is not currently in stock.");
 
+            if (stockOutDto.SoldDate > DateTime.UtcNow)
+                throw new ArgumentException("Sold date cannot be in the future.");
+
+            var isAlreadySold = await _context.StockOuts
+                .AnyAsync(so => so.ProductItemId == stockOutDto.ProductItemId);
+
+            if (isAlreadySold)
+                throw new InvalidOperationException("This product item has already been sold.");
+
+            var stockIn = await _context.StockIns
+                .FirstOrDefaultAsync(si => si.ProductItemId == stockOutDto.ProductItemId);
+
+            if (stockIn == null)
+                throw new InvalidOperationException("This product item hasn't been stocked in yet.");
+
+            if (stockOutDto.SoldDate < stockIn.ReceivedDate)
+                throw new ArgumentException("Sold date cannot be before received date.");
+
+            if (productItem.Expiry_Date < stockOutDto.SoldDate)
+                throw new ArgumentException("Cannot sell an expired product.");
+
+
             // Update item status to Sold 
             productItem.Status = ProductItemStatus.Sold;
 
@@ -85,7 +107,7 @@ namespace JwtAuth.Controllers
             if (!int.TryParse(parts[1], out int productItemId) || !int.TryParse(parts[5], out int productId))
                 throw new ArgumentException("Invalid product item ID or product ID.");
 
-            var serialNumber = parts[3];
+            var serialNumber = parts[3].Trim();
 
             // Find matching product item
             var productItem = await _context.ProductItems
@@ -103,6 +125,27 @@ namespace JwtAuth.Controllers
 
             if (productItem.Status != ProductItemStatus.InStock)
                 throw new ArgumentException("Product item is not in stock.");
+
+            if (dto.SoldDate > DateTime.UtcNow)
+                throw new ArgumentException("Sold date cannot be in the future.");
+
+            var alreadySold = await _context.StockOuts
+                .AnyAsync(so => so.ProductItemId == productItem.Id);
+
+            if (alreadySold)
+                throw new ArgumentException("This item is already sold.");
+
+            var stockIn = await _context.StockIns
+                .FirstOrDefaultAsync(si => si.ProductItemId == productItem.Id);
+
+            if (stockIn == null)
+                throw new InvalidOperationException("This item hasn't been stocked in yet.");
+
+            if (dto.SoldDate < stockIn.ReceivedDate)
+                throw new ArgumentException("Sold date cannot be before received date.");
+
+            if (productItem.Expiry_Date < dto.SoldDate)
+                throw new ArgumentException("Cannot sell an expired product.");
 
             // Update item status to Sold
             productItem.Status = ProductItemStatus.Sold;

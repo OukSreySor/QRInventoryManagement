@@ -49,6 +49,15 @@ namespace JwtAuth.Controllers
             if (productItem.Status == ProductItemStatus.InStock)
                 throw new ArgumentException("Product item already stocked in.");
 
+            if (stockInDto.ReceivedDate > DateTime.UtcNow)
+                throw new ArgumentException("Received date cannot be in the future.");
+
+            if (stockInDto.ReceivedDate < productItem.Manufacturing_Date)
+                throw new ArgumentException("Received date cannot be before manufacturing date.");
+
+            if (stockInDto.ReceivedDate > productItem.Expiry_Date)
+                throw new ArgumentException("Received date cannot be after expiry date.");
+
             // Update item status to InStock
             productItem.Status = ProductItemStatus.InStock;
 
