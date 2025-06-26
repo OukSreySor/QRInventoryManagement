@@ -30,11 +30,11 @@ namespace JwtAuth.Controllers
         }
 
         [HttpPost("login")]
-        public async Task<ActionResult<TokenResponseDto>> Login(UserDto request)
+        public async Task<ActionResult<TokenResponseDto>> Login(UserLoginDto request)
         {
             var result = await authService.LoginAsync(request);
             if (result == null)
-                throw new UnauthorizedAccessException("Invalid username or password.");
+                throw new UnauthorizedAccessException("Invalid email or password.");
 
             return Ok(new { success = true, data = result });
         }
@@ -70,11 +70,23 @@ namespace JwtAuth.Controllers
             return Ok(new { success = true, message = "You are a user." });
         }
 
+        [Authorize]
+        [HttpGet("profile")]
+        public async Task<IActionResult> GetMyProfile()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null)
+                throw new UnauthorizedAccessException("Unauthorized Access");
 
+            if (!Guid.TryParse(userIdClaim.Value, out var userId))
+                throw new ArgumentException("Invalid user ID in token.");
 
+            var user = await authService.GetUserProfileAsync(userId);
+            if (user == null)
+                throw new KeyNotFoundException("User not found.");
 
+            return Ok(new { success = true, data = user });
 
+        }
     }
-
-
 }

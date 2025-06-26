@@ -14,9 +14,9 @@ namespace JwtAuth.Services
 {
     public class AuthService(AppDbContext context, IConfiguration configuration) : IAuthService
     {
-        public async Task<TokenResponseDto?> LoginAsync(UserDto request)
+        public async Task<TokenResponseDto?> LoginAsync(UserLoginDto request)
         {
-            var user = await context.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
+            var user = await context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
             if (user == null)
             {
                 return null;
@@ -42,7 +42,7 @@ namespace JwtAuth.Services
 
         public async Task<User?> RegisterAsync(UserDto request)
         {   
-            if (await context.Users.AnyAsync(u => u.Username == request.Username))
+            if (await context.Users.AnyAsync(u => u.Username == request.Username || u.Email == request.Email))
             {
                 return null;
             }
@@ -51,6 +51,7 @@ namespace JwtAuth.Services
                 .HashPassword(user, request.Password);
 
             user.Username = request.Username;
+            user.Email = request.Email;
             user.PasswordHash = hashedPassword;
             user.Role = string.IsNullOrWhiteSpace(request.Role) ? "User" : request.Role;
 
@@ -124,9 +125,21 @@ namespace JwtAuth.Services
 
             return new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);
 
-
+        }
+        public async Task<UserProfileDto?> GetUserProfileAsync(Guid userId)
+        {
+            return await context.Users
+                .Where(u => u.Id == userId)
+                .Select(u => new UserProfileDto
+                {
+                    Id = u.Id,
+                    Username = u.Username,
+                    Email = u.Email,
+                    Role = u.Role,
+                    CreatedAt = u.CreatedAt
+                })
+                .FirstOrDefaultAsync();
         }
 
-        
     }
 }
