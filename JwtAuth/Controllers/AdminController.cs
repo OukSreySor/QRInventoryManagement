@@ -79,13 +79,13 @@ namespace JwtAuth.Controllers
             });
         }
         [HttpDelete("users/{id}")]
-        public async Task<IActionResult> DeleteUser(Guid id)
+        public async Task<IActionResult> SoftDeleteUser(Guid id)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == id);
             if (user == null)
                 throw new KeyNotFoundException("User not found");
 
-            _context.Users.Remove(user);
+            user.IsDeleted = true;
             await _context.SaveChangesAsync();
 
             return Ok(new { success = true, message = "User deleted successfully." });

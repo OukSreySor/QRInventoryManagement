@@ -16,7 +16,7 @@ namespace JwtAuth.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class AuthController(IAuthService authService) : ControllerBase
+    public class AuthController(IAuthService authService) : BaseController
     {
         public static User user = new();
         [HttpPost("register")]
@@ -74,12 +74,7 @@ namespace JwtAuth.Controllers
         [HttpGet("profile")]
         public async Task<IActionResult> GetMyProfile()
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-            if (userIdClaim == null)
-                throw new UnauthorizedAccessException("Unauthorized Access");
-
-            if (!Guid.TryParse(userIdClaim.Value, out var userId))
-                throw new ArgumentException("Invalid user ID in token.");
+            var userId = GetValidUserId();
 
             var user = await authService.GetUserProfileAsync(userId);
             if (user == null)

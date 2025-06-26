@@ -103,6 +103,9 @@ namespace JwtAuth.Data
             modelBuilder.Entity<ProductItem>()
                 .Property(pi => pi.Status)
                 .HasConversion<string>();
+
+            modelBuilder.Entity<User>()
+                .HasQueryFilter(u => !u.IsDeleted);
         }
 
 
