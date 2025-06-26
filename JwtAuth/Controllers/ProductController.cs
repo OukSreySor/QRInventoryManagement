@@ -27,67 +27,44 @@ namespace JwtAuth.Controllers
         [HttpGet]
         public async Task<IActionResult> GetProducts()
         {
-            var userId = GetValidUserId();
-            var userRole = GetValidUserRole();
-
-            // Start building the query
-            var productsQuery = _context.Products
+            var products = await _context.Products
                 .Include(p => p.ProductItems)
-                .AsQueryable();
-
-            // If the user is not an admin, filter products by their own UserId
-            if (userRole != "Admin")
-            {
-                productsQuery = productsQuery.Where(p => p.UserId == userId);
-            }
-
-            var products = await productsQuery
-            .Select(p => new ProductDto
-            {
-                Id = p.Id,
-                Name = p.Name,
-                Description = p.Description,
-                Image = p.Image,
-                Unit_Price = p.Unit_Price,
-                Selling_Price = p.Selling_Price,
-                Quantity = p.ProductItems.Count(pi => pi.Status == ProductItemStatus.InStock),
-                CategoryId = p.CategoryId,
-                UserId = p.UserId,
-                Status = p.Status,
-                ProductItems = p.ProductItems.Select(pi => new ProductItemDto
+                .Select(p => new ProductDto
                 {
-                    Id = pi.Id,
-                    QR_Code = pi.QR_Code,
-                    Serial_Number = pi.Serial_Number,
-                    Status = pi.Status,
-                    ProductId = pi.ProductId,
-                    UserId = pi.UserId
+                    Id = p.Id,
+                    Name = p.Name,
+                    Description = p.Description,
+                    Image = p.Image,
+                    Unit_Price = p.Unit_Price,
+                    Selling_Price = p.Selling_Price,
+                    Quantity = p.ProductItems.Count(pi => pi.Status == ProductItemStatus.InStock),
+                    CategoryId = p.CategoryId,
+                    UserId = p.UserId,
+                    Status = p.Status,
+                    ProductItems = p.ProductItems.Select(pi => new ProductItemDto
+                    {
+                        Id = pi.Id,
+                        QR_Code = pi.QR_Code,
+                        Serial_Number = pi.Serial_Number,
+                        Status = pi.Status,
+                        ProductId = pi.ProductId,
+                        UserId = pi.UserId
 
-                }).ToList()
-            }).ToListAsync();
+                    }).ToList()
+                }).ToListAsync();
 
-            return Ok(new { success = true, data = products });
+             return Ok(new { success = true, data = products });
         }
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetProduct(int id)
         {
-            var userId = GetValidUserId();
-            var userRole = GetValidUserRole();
-
-            var productQuery = _context.Products
-                .Include(p => p.ProductItems)
-                .Where(p => p.Id == id);
-
-            if (userRole == "User")
-            {
-                productQuery = productQuery.Where(p => p.UserId == userId);
-            }
-
             if (id <= 0)
                 throw new ArgumentException("Invalid product ID.");
 
-            var product = await productQuery
+            var product = await _context.Products
+                .Include(p  => p.ProductItems)
+                .Where(p => p.Id == id)
                 .Select(p => new ProductDto
                 {
                     Id = p.Id,
@@ -113,7 +90,7 @@ namespace JwtAuth.Controllers
                 }).FirstOrDefaultAsync();
 
             if (product == null)
-                throw new KeyNotFoundException("Product not found or access denied.");
+                throw new KeyNotFoundException("Product not found");
 
             return Ok(new { success = true, data = product });
         }
@@ -169,6 +146,7 @@ namespace JwtAuth.Controllers
             _context.Products.Add(product);
             await _context.SaveChangesAsync();
             await _productService.UpdateProductStatusAsync(product.Id);
+
             return Ok(new { success = true, data = product });
 
         }

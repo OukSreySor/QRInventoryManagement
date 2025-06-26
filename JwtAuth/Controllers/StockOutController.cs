@@ -30,14 +30,10 @@ namespace JwtAuth.Controllers
         public async Task<IActionResult> StockOut(StockOutDto stockOutDto)
         {
             var userId = GetValidUserId(); 
-            var userRole = GetValidUserRole();
 
             var productItem = await _context.ProductItems.FirstOrDefaultAsync(pi => pi.Id == stockOutDto.ProductItemId);
             if (productItem == null)
                 throw new KeyNotFoundException($"ProductItem with Id {stockOutDto.ProductItemId} not found.");
-
-            if (userRole == "User" && productItem.UserId != userId)
-                throw new UnauthorizedAccessException("You are not allowed to stock out this product item.");
 
             if (productItem.Status != ProductItemStatus.InStock)
                 throw new ArgumentException("ProductItem is not currently in stock.");
@@ -97,7 +93,6 @@ namespace JwtAuth.Controllers
         public async Task<IActionResult> ScanAndStockOut(QrStockOutDto dto)
         {
             var userId = GetValidUserId(); 
-            var userRole = GetValidUserRole();
 
             // Parse QR code format
             var parts = dto.QRCode.Split('-');
@@ -118,10 +113,6 @@ namespace JwtAuth.Controllers
 
             if (productItem == null)
                 throw new KeyNotFoundException("Product item not found.");
-
-            // Validate access
-            if (userRole == "User" && productItem.UserId != userId)
-                throw new UnauthorizedAccessException("You are not allowed to stock out this product item.");
 
             if (productItem.Status != ProductItemStatus.InStock)
                 throw new ArgumentException("Product item is not in stock.");

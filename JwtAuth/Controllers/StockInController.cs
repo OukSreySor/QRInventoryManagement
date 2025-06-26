@@ -37,14 +37,10 @@ namespace JwtAuth.Controllers
         public async Task<IActionResult> StockIn(StockInDto stockInDto)
         {
             var userId = GetValidUserId();
-            var userRole = GetValidUserRole();
 
             var productItem = await _context.ProductItems.FirstOrDefaultAsync(pi => pi.Id == stockInDto.ProductItemId);
             if (productItem == null)
                 throw new KeyNotFoundException($"ProductItem with Id {stockInDto.ProductItemId} not found.");
-
-            if (userRole == "User" && productItem.UserId != userId)
-                throw new UnauthorizedAccessException("You are not allowed to stock in this product item.");
 
             if (productItem.Status == ProductItemStatus.InStock)
                 throw new ArgumentException("Product item already stocked in.");

@@ -57,7 +57,7 @@ namespace JwtAuth.Services
             user.Username = request.UserDto.Username;
             user.Email = request.UserDto.Email;
             user.PasswordHash = hashedPassword;
-            //user.Role = string.IsNullOrWhiteSpace(request.Role) ? "User" : request.Role;
+            
             if (!hasAnyUser)
             {
                 // First user becomes Admin (no invite code required)

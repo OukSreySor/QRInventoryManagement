@@ -25,17 +25,7 @@ namespace JwtAuth.Controllers
             [HttpGet]
             public async Task<IActionResult> GetCategories()
             {
-                var userId = GetValidUserId();
-                var userRole = GetValidUserRole();
-
-                var categoriesQuery = _context.Categories.AsQueryable();
-
-                if (userRole == "User")
-                {
-                    categoriesQuery = categoriesQuery.Where(c => c.UserId == userId);
-                }
-
-                var categories = await categoriesQuery
+                var categories = await _context.Categories
                     .Select(c => new CategoryDto
                     {
                         Id = c.Id,
@@ -50,16 +40,10 @@ namespace JwtAuth.Controllers
             [HttpGet("{id}")]
             public async Task<IActionResult> GetCategory(int id)
             {
-                var userId = GetValidUserId();
-                var userRole = GetValidUserRole();
+            if (id <= 0)
+                throw new ArgumentException("Invalid category ID.");
 
-                var categoryQuery = _context.Categories.Where(c => c.Id == id);
-
-                if (userRole == "User")
-                {
-                    categoryQuery = categoryQuery.Where(c => c.UserId == userId);
-                }
-                var category = await categoryQuery
+            var category = await _context.Categories
                     .Select(c => new CategoryDto
                 {
                     Id = c.Id,
@@ -115,7 +99,7 @@ namespace JwtAuth.Controllers
 
                 category.Name = categoryDto.Name;
                 category.Description = categoryDto.Description;
-                category.UserId = userId;
+                // Keep UserId as original owner
                 category.UpdatedAt = DateTime.UtcNow;
 
                 await _context.SaveChangesAsync();
@@ -145,7 +129,7 @@ namespace JwtAuth.Controllers
                 if (category.Products.Any())
                 throw new ArgumentException("Cannot delete a category that has products.");
 
-            _context.Categories.Remove(category);
+                _context.Categories.Remove(category);
                 await _context.SaveChangesAsync();
                 return Ok(new { success = true, message = "Category deleted successfully." });
             }

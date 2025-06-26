@@ -35,17 +35,7 @@ namespace JwtAuth.Controllers
         [HttpGet]
         public async Task<IActionResult> GetProductItems()
         {
-            var userId = GetValidUserId();
-            var userRole = GetValidUserRole();
-
-            var productItemsQuery = _context.ProductItems.AsQueryable();
-
-            if (userRole == "User")
-            {
-                productItemsQuery = productItemsQuery.Where(pi => pi.UserId == userId);
-            }
-
-            var productItems = await productItemsQuery
+            var productItems = await _context.ProductItems
                 .Select(pi => new ProductItemDto
                 {
                     Id = pi.Id,
@@ -55,25 +45,18 @@ namespace JwtAuth.Controllers
                     ProductId = pi.ProductId,
                     UserId = pi.UserId
                 }).ToListAsync();
+
             return Ok(new { success = true, data = productItems });
         }
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetProductItem(int id)
         {
-            var userId = GetValidUserId();
-            var userRole = GetValidUserRole();
-
             if (id <= 0)
                 throw new ArgumentException("Invalid product item ID.");
 
-            var productItemQuery = _context.ProductItems.Where(pi => pi.Id == id);
-
-            if (userRole == "User")
-            {
-                productItemQuery = productItemQuery.Where(pi => pi.UserId == userId);
-            }
-            var productItem = await productItemQuery
+            var productItem = await _context.ProductItems
+                .Where(pi => pi.Id == id)
                 .Select(pi => new ProductItemDto
                 {
                     Id = pi.Id,
