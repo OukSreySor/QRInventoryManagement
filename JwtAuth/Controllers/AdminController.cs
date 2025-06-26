@@ -1,4 +1,5 @@
 ﻿using JwtAuth.Data;
+using JwtAuth.Entity;
 using JwtAuth.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -89,6 +90,16 @@ namespace JwtAuth.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(new { success = true, message = "User deleted successfully." });
+        }
+        [HttpPost("generate-invite-code")]
+        public async Task<IActionResult> CreateInviteCode()
+        {
+            var inviteCode = new InviteCode();
+
+            _context.InviteCodes.Add(inviteCode);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { success = true, data = inviteCode.Code });
         }
     }
 

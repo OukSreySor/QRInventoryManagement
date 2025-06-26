@@ -20,11 +20,11 @@ namespace JwtAuth.Controllers
     {
         public static User user = new();
         [HttpPost("register")]
-        public async Task<ActionResult<User>> Register(UserDto request)
+        public async Task<ActionResult<User>> Register(RegisterRequestDto request)
         {
             var user = await authService.RegisterAsync(request);
             if (user == null)
-                throw new ArgumentException("Username already exists.");
+                throw new ArgumentException("Invalid invite code or username/email already exists.");
 
             return Ok(new { success = true, data = user });
         }

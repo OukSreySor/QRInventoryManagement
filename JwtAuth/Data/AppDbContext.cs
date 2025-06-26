@@ -11,6 +11,7 @@ namespace JwtAuth.Data
         public DbSet<StockIn> StockIns { get; set; }
         public DbSet<StockOut> StockOuts { get; set; }
         public DbSet<Transaction> Transactions { get; set; }
+        public DbSet<InviteCode> InviteCodes { get; set; } 
 
 
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

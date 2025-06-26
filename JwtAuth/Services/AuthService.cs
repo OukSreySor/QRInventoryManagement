@@ -40,21 +40,43 @@ namespace JwtAuth.Services
             };
         }
 
-        public async Task<User?> RegisterAsync(UserDto request)
-        {   
-            if (await context.Users.AnyAsync(u => u.Username == request.Username || u.Email == request.Email))
+        public async Task<User?> RegisterAsync(RegisterRequestDto request)
+        {
+            
+            if (await context.Users.AnyAsync(u => u.Username == request.UserDto.Username || u.Email == request.UserDto.Email))
             {
                 return null;
             }
+
+            bool hasAnyUser = await context.Users.AnyAsync();
+
             var user = new User();
             var hashedPassword = new PasswordHasher<User>()
-                .HashPassword(user, request.Password);
+                .HashPassword(user, request.UserDto.Password);
 
-            user.Username = request.Username;
-            user.Email = request.Email;
+            user.Username = request.UserDto.Username;
+            user.Email = request.UserDto.Email;
             user.PasswordHash = hashedPassword;
-            user.Role = string.IsNullOrWhiteSpace(request.Role) ? "User" : request.Role;
+            //user.Role = string.IsNullOrWhiteSpace(request.Role) ? "User" : request.Role;
+            if (!hasAnyUser)
+            {
+                // First user becomes Admin (no invite code required)
+                user.Role = "Admin";
+            }
+            else
+            {
+                // Must provide valid invite code
+                var code = await context.InviteCodes.FirstOrDefaultAsync(c => c.Code == request.InviteCode && !c.IsUsed);
+                if (code == null)
+                {
+                    throw new ArgumentException("Invalid or already used invite code.");
+                }
 
+                // Mark code as used
+                code.IsUsed = true;
+                user.Role = "User";
+                code.UsedAt = DateTime.UtcNow;
+            }
             context.Users.Add(user);
             await context.SaveChangesAsync();
 
