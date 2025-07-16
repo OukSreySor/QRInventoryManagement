@@ -14,7 +14,7 @@ namespace JwtAuth.Services
 {
     public class AuthService(AppDbContext context, IConfiguration configuration) : IAuthService
     {
-        public async Task<TokenResponseDto?> LoginAsync(UserLoginDto request)
+        public async Task<TokenResponseDto?> LoginAsync(LoginRequestDto request)
         {
             var user = await context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
             if (user == null)

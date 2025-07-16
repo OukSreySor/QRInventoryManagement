@@ -30,7 +30,7 @@ namespace JwtAuth.Controllers
         }
 
         [HttpPost("login")]
-        public async Task<ActionResult<TokenResponseDto>> Login(UserLoginDto request)
+        public async Task<ActionResult<TokenResponseDto>> Login(LoginRequestDto request)
         {
             var result = await authService.LoginAsync(request);
             if (result == null)

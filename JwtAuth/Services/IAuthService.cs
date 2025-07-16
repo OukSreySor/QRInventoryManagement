@@ -7,7 +7,7 @@ namespace JwtAuth.Services
     {
         Task<User?> RegisterAsync(RegisterRequestDto request);
 
-        Task<TokenResponseDto?> LoginAsync(UserLoginDto request);
+        Task<TokenResponseDto?> LoginAsync(LoginRequestDto request);
 
         Task<TokenResponseDto> RefreshTokenAsync(RefreshTokenRequestDto request);
         Task<UserProfileDto?> GetUserProfileAsync(Guid userId);

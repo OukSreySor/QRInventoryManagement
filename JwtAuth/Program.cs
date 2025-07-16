@@ -8,7 +8,23 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Scalar.AspNetCore;
 
+
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFlutterWeb",
+        policy =>
+        {
+            policy.WithOrigins(
+                "http://localhost:50405"
+                
+                ) 
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials(); 
+        });
+});
 
 // Add services to the container.
 
@@ -73,6 +89,7 @@ builder.Services.AddScoped<ProductService>();
 var app = builder.Build();
 
 app.UseStaticFiles();
+app.UseCors("AllowFlutterWeb");
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -81,7 +98,7 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 
 app.UseSwagger();
 app.UseSwaggerUI();

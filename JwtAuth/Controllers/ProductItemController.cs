@@ -131,7 +131,7 @@ namespace JwtAuth.Controllers
             await _productService.UpdateProductStatusAsync(productItem.ProductId);
 
             // Generate QR string (unique text identifier)
-            var qrString = $"PIID-{productItem.Id}-SN-{productItem.Serial_Number}-PID-{productItem.ProductId}";
+            var qrString = $"PIID|{productItem.Id}|SN|{productItem.Serial_Number}|PID|{productItem.ProductId}";
 
             // Save QR string to product item
             productItem.QR_Code = qrString;
@@ -146,8 +146,8 @@ namespace JwtAuth.Controllers
             if (!Directory.Exists(qrFolder))
                 Directory.CreateDirectory(qrFolder);
 
-            var fileName = $"{qrString}.png";
-            var filePath = Path.Combine(qrFolder, fileName);
+            var safeFileName = qrString.Replace("|", "_");
+            var filePath = Path.Combine(qrFolder, safeFileName);
 
             using (var image = Image.Load<Rgba32>(qrBytes))
             {
@@ -155,7 +155,7 @@ namespace JwtAuth.Controllers
             }
 
             var baseUrl = $"{Request.Scheme}://{Request.Host}";
-            var qrImageUrl = $"{baseUrl}/qrcodes/{fileName}";
+            var qrImageUrl = $"{baseUrl}/qrcodes/{safeFileName}";
 
             var result = new
             {
@@ -177,8 +177,8 @@ namespace JwtAuth.Controllers
         {
             var userId = GetValidUserId();
 
-            // Format: PIID-1-SN-ABC-PID-1
-            var parts = code.Split('-');
+            // Format: PIID|1|SN|ABC|PID|1
+            var parts = code.Split('|');
 
             if (parts.Length != 6 || parts[0] != "PIID" || parts[2] != "SN" || parts[4] != "PID")
                 throw new ArgumentException("Invalid QR code format.");
@@ -193,8 +193,7 @@ namespace JwtAuth.Controllers
                 .FirstOrDefaultAsync(pi =>
                     pi.Id == productItemId &&
                     pi.Serial_Number == serialNumber &&
-                    pi.ProductId == productId &&
-                    pi.Product.UserId == userId
+                    pi.ProductId == productId
                 );
 
             if (productItem == null)
@@ -298,6 +297,121 @@ namespace JwtAuth.Controllers
 
             return Ok(new { success = true, message = "Product item deleted successfully." });
         }
+
+        [HttpPost("create-stockin")]
+        public async Task<IActionResult> CreateAndStockIn(ProductItemStockInDto dto)
+        {
+            var userId = GetValidUserId();
+            
+            var productExists = await _context.Products.AnyAsync(p => p.Id == dto.ProductId);
+            if (!productExists)
+                throw new ArgumentException("Invalid ProductId.");
+
+            if (dto.Manufacturing_Date > dto.Expiry_Date)
+                throw new ArgumentException("Expiry date must be after manufacturing date.");
+
+            if (dto.Expiry_Date <= DateTime.UtcNow)
+                throw new ArgumentException("Expiry date must be a future date.");
+
+            if (dto.Manufacturing_Date > DateTime.UtcNow)
+                throw new ArgumentException("Manufacturing date cannot be in the future.");
+
+            if (dto.AddedDate > DateTime.UtcNow)
+                throw new ArgumentException("Added date cannot be in the future.");
+
+            if (dto.AddedDate < dto.Manufacturing_Date)
+                throw new ArgumentException("Added date cannot be before manufacturing date.");
+
+            if (dto.AddedDate > dto.Expiry_Date)
+                throw new ArgumentException("Added date cannot be after expiry date.");
+
+            var isDuplicateSerial = await _context.ProductItems
+                .AnyAsync(p => p.Serial_Number == dto.Serial_Number && p.ProductId == dto.ProductId);
+
+            if (isDuplicateSerial)
+                throw new ArgumentException("Duplicate serial number within the same product.");
+
+            // Create product item with status InStock
+            var productItem = new ProductItem
+            {
+                Serial_Number = dto.Serial_Number,
+                Status = ProductItemStatus.InStock,
+                Manufacturing_Date = dto.Manufacturing_Date,
+                Expiry_Date = dto.Expiry_Date,
+                ProductId = dto.ProductId,
+                UserId = userId, 
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            await _context.ProductItems.AddAsync(productItem);
+            await _context.SaveChangesAsync();
+
+            var qrString = $"PIID|{productItem.Id}|SN|{productItem.Serial_Number}|PID|{productItem.ProductId}";
+            productItem.QR_Code = qrString;
+            await _context.SaveChangesAsync();
+
+            // Generate QR image
+            var qrGenerator = new QRCodeGenerator();
+            var qrCodeData = qrGenerator.CreateQrCode(qrString, QRCodeGenerator.ECCLevel.Q);
+            var qrCode = new PngByteQRCode(qrCodeData);
+            var qrBytes = qrCode.GetGraphic(15);
+
+            var qrFolder = Path.Combine(_env.WebRootPath ?? "wwwroot", "qrcodes");
+            if (!Directory.Exists(qrFolder))
+                Directory.CreateDirectory(qrFolder);
+
+            var safeFileName = qrString.Replace("|", "_");
+            var filePath = Path.Combine(qrFolder, safeFileName);
+            using (var image = Image.Load<Rgba32>(qrBytes))
+            {
+                image.Save(filePath, new PngEncoder());
+            }
+
+            var baseUrl = $"{Request.Scheme}://{Request.Host}";
+            var qrImageUrl = $"{baseUrl}/qrcodes/{safeFileName}";
+
+            // Create StockIn record
+            var stockIn = new StockIn
+            {
+                ProductItemId = productItem.Id,
+                UserId = userId,
+                ReceivedDate = dto.AddedDate
+            };
+            await _context.StockIns.AddAsync(stockIn);
+
+            // Create Transaction record
+            var transaction = new Transaction
+            {
+                ProductItemId = productItem.Id,
+                UserId = userId,
+                TransactionType = TransactionType.StockIn,
+                TransactionDate = dto.AddedDate
+            };
+            await _context.Transactions.AddAsync(transaction);
+
+            await _context.SaveChangesAsync();
+            await _productService.UpdateProductStatusAsync(productItem.ProductId);
+
+            return Ok(new
+            {
+                success = true,
+                data = new
+                {
+                    productItem.Id,
+                    productItem.Serial_Number,
+                    productItem.Status,
+                    productItem.ProductId,
+                    productItem.Manufacturing_Date,
+                    productItem.Expiry_Date,
+                    productItem.QR_Code,
+                    QRImageUrl = qrImageUrl
+                }
+            });
+        }
+
+
+
 
     }
 }
