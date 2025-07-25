@@ -95,7 +95,7 @@ namespace JwtAuth.Controllers
             var userId = GetValidUserId(); 
 
             // Parse QR code format
-            var parts = dto.QRCode.Split('-');
+            var parts = dto.QRCode.Split('|');
             if (parts.Length != 6 || parts[0] != "PIID" || parts[2] != "SN" || parts[4] != "PID")
                 throw new ArgumentException("Invalid QR code format.");
 

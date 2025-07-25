@@ -147,7 +147,8 @@ namespace JwtAuth.Controllers
                 Directory.CreateDirectory(qrFolder);
 
             var safeFileName = qrString.Replace("|", "_");
-            var filePath = Path.Combine(qrFolder, safeFileName);
+            var fileName = $"{safeFileName}.png";
+            var filePath = Path.Combine(qrFolder, fileName);
 
             using (var image = Image.Load<Rgba32>(qrBytes))
             {
@@ -155,7 +156,7 @@ namespace JwtAuth.Controllers
             }
 
             var baseUrl = $"{Request.Scheme}://{Request.Host}";
-            var qrImageUrl = $"{baseUrl}/qrcodes/{safeFileName}";
+            var qrImageUrl = $"{baseUrl}/qrcodes/{fileName}";
 
             var result = new
             {
@@ -335,7 +336,7 @@ namespace JwtAuth.Controllers
             var productItem = new ProductItem
             {
                 Serial_Number = dto.Serial_Number,
-                Status = ProductItemStatus.InStock,
+                Status = ProductItemStatus.InStock,             // This is a stock-in operation, so mark it as InStock
                 Manufacturing_Date = dto.Manufacturing_Date,
                 Expiry_Date = dto.Expiry_Date,
                 ProductId = dto.ProductId,
@@ -362,14 +363,16 @@ namespace JwtAuth.Controllers
                 Directory.CreateDirectory(qrFolder);
 
             var safeFileName = qrString.Replace("|", "_");
-            var filePath = Path.Combine(qrFolder, safeFileName);
+            var fileName = $"{safeFileName}.png";
+            var filePath = Path.Combine(qrFolder, fileName);
+
             using (var image = Image.Load<Rgba32>(qrBytes))
             {
                 image.Save(filePath, new PngEncoder());
             }
 
             var baseUrl = $"{Request.Scheme}://{Request.Host}";
-            var qrImageUrl = $"{baseUrl}/qrcodes/{safeFileName}";
+            var qrImageUrl = $"{baseUrl}/qrcodes/{fileName}";
 
             // Create StockIn record
             var stockIn = new StockIn
@@ -408,6 +411,41 @@ namespace JwtAuth.Controllers
                     QRImageUrl = qrImageUrl
                 }
             });
+        }
+
+        [HttpGet("by-product/{productId}")]
+        public async Task<IActionResult> GetProductItemsByProduct(int productId)
+        {
+            var productExists = await _context.Products.AnyAsync(p => p.Id == productId);
+            if (!productExists)
+            {
+                return NotFound(new { success = false, message = "Product not found." });
+            }
+
+            var query = _context.ProductItems
+                .Include(pi => pi.Product)
+                .Include(pi => pi.User)
+                .Include(pi => pi.StockIns) 
+                .Where(pi => pi.ProductId == productId);
+
+            var items = await query.Select(pi => new ProductItemDetailDto
+            {
+                Id = pi.Id,
+                Serial_Number = pi.Serial_Number,
+                Manufacturing_Date = pi.Manufacturing_Date,
+                Expiry_Date = pi.Expiry_Date,
+                Unit_Price = pi.Product.Unit_Price,
+                Selling_Price = pi.Product.Selling_Price,
+                QR_Code = pi.QR_Code,
+                QRImageUrl = $"{Request.Scheme}://{Request.Host}/qrcodes/PIID_{pi.Id}_SN_{pi.Serial_Number}_PID_{pi.ProductId}.png",
+                ProductName = pi.Product.Name,
+                UserName = pi.User != null ? pi.User.Username : "Unknown",
+                AddedDate = pi.StockIns.Any() 
+                        ? pi.StockIns.OrderByDescending(s => s.ReceivedDate).First().ReceivedDate
+                        : pi.CreatedAt
+            }).ToListAsync();
+
+            return Ok(new { success = true, data = items });
         }
 
 

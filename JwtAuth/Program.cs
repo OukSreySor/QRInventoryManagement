@@ -13,18 +13,32 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowFlutterWeb",
+    options.AddPolicy("AllowAllOriginsForDev",
         policy =>
         {
-            policy.WithOrigins(
-                "http://localhost:50405"
-                
-                ) 
+            policy.AllowAnyOrigin()
                   .AllowAnyHeader()
-                  .AllowAnyMethod()
-                  .AllowCredentials(); 
+                  .AllowAnyMethod();
+
         });
 });
+
+// FlutterWeb
+
+//builder.Services.AddCors(options =>
+//{
+//    options.AddPolicy("AllowFlutterWeb",
+//        policy =>
+//        {
+//            policy.WithOrigins(
+//                "http://localhost:59980"
+
+//                )
+//                  .AllowAnyHeader()
+//                  .AllowAnyMethod()
+//                  .AllowCredentials();
+//        });
+//});
 
 // Add services to the container.
 
@@ -88,8 +102,9 @@ builder.Services.AddScoped<ProductService>();
 
 var app = builder.Build();
 
-app.UseStaticFiles();
-app.UseCors("AllowFlutterWeb");
+app.UseCors("AllowAllOriginsForDev");
+
+//app.UseCors("AllowFlutterWeb");
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -97,6 +112,18 @@ if (app.Environment.IsDevelopment())
     //app.MapOpenApi();
     app.MapScalarApiReference();
 }
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        if (ctx.Context.Request.Path.StartsWithSegments("/qrcodes"))
+        {
+            ctx.Context.Response.Headers["Access-Control-Allow-Origin"] = "*";
+        }
+    }
+});
+
 
 //app.UseHttpsRedirection();
 

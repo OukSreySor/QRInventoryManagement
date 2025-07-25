@@ -14,6 +14,7 @@
         Sold,
         Damaged,
         Reserved,
+        Repaired,
         Lost
     }
     public enum TransactionType

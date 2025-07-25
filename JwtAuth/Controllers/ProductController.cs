@@ -28,17 +28,23 @@ namespace JwtAuth.Controllers
         public async Task<IActionResult> GetProducts()
         {
             var products = await _context.Products
+                .Include(p => p.Category)
                 .Include(p => p.ProductItems)
                 .Select(p => new ProductDto
                 {
                     Id = p.Id,
                     Name = p.Name,
                     Description = p.Description,
-                    Image = p.Image,
                     Unit_Price = p.Unit_Price,
                     Selling_Price = p.Selling_Price,
                     Quantity = p.ProductItems.Count(pi => pi.Status == ProductItemStatus.InStock),
                     CategoryId = p.CategoryId,
+                    Category = new CategoryDto
+                    {
+                        Id = p.CategoryId,
+                        Name = p.Category.Name,
+                        Description = p.Category.Description
+                    },
                     UserId = p.UserId,
                     Status = p.Status,
                     ProductItems = p.ProductItems.Select(pi => new ProductItemDto
@@ -94,8 +100,23 @@ namespace JwtAuth.Controllers
 
             return Ok(new { success = true, data = product });
         }
+
+        [HttpGet("names")]
+        public async Task<IActionResult> GetProductNames()
+        {
+            var productNames = await _context.Products
+                .Select(p => new ProductDropdownDto
+                {
+                    Id = p.Id,
+                    Name = p.Name
+                })
+                .ToListAsync();
+
+            return Ok(new { success = true, data = productNames });
+        }
+
         [HttpPost]
-        public async Task<IActionResult> CreateProduct(ProductDto productDto)
+        public async Task<IActionResult> CreateProduct(CreateProductDto productDto)
         {
             var userId = GetValidUserId();
             var userRole = GetValidUserRole();
@@ -135,7 +156,6 @@ namespace JwtAuth.Controllers
             {
                 Name = productDto.Name,
                 Description = productDto.Description,
-                Image = productDto.Image,
                 Unit_Price = productDto.Unit_Price,
                 Selling_Price = productDto.Selling_Price,
                 CategoryId = productDto.CategoryId,
@@ -151,7 +171,7 @@ namespace JwtAuth.Controllers
 
         }
         [HttpPut("{id}")]
-        public async Task<IActionResult> EditProduct(int id, ProductDto productDto)
+        public async Task<IActionResult> EditProduct(int id, CreateProductDto productDto)
         {
             var userId = GetValidUserId();
             var userRole = GetValidUserRole();
@@ -203,7 +223,6 @@ namespace JwtAuth.Controllers
 
             product.Name = productDto.Name;
             product.Description = productDto.Description;
-            product.Image = productDto.Image;
             product.Unit_Price = productDto.Unit_Price;
             product.Selling_Price = productDto.Selling_Price;
             product.CategoryId = productDto.CategoryId;
@@ -246,6 +265,29 @@ namespace JwtAuth.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(new { success = true, message = "Product deleted successfully." });      
+        }
+
+        [HttpGet("stock-summary")]
+        public async Task<IActionResult> GetProductStock()
+        {
+            var userId = GetValidUserId();
+
+            var productQuery = _context.Products
+                .Include(p => p.Category)
+                .Include(p => p.ProductItems)
+                .AsQueryable();
+
+            var summaries = await productQuery
+                .Select(p => new ProductStockSummaryDto
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    CategoryName = p.Category.Name,
+                    QuantityInStock = p.ProductItems.Count(pi => pi.Status == ProductItemStatus.InStock)
+                })
+                .ToListAsync();
+
+            return Ok(new { success = true, data = summaries });
         }
     }
 }

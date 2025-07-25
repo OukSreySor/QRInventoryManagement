@@ -11,7 +11,7 @@ namespace JwtAuth.Controllers
     [Route("api/[controller]")]
     [ApiController]
     [Authorize(Roles = "Admin")]
-    public class AdminController : ControllerBase
+    public class AdminController : BaseController
     {
         private readonly AppDbContext _context;
 
@@ -27,8 +27,11 @@ namespace JwtAuth.Controllers
                 {
                     u.Id,
                     u.Username,
+                    u.Email,
                     u.Role,
                     u.CreatedAt,
+                    u.IsDeleted,
+
                 }).ToListAsync();
             return Ok( new { success = true, data = users });
         }
@@ -91,6 +94,7 @@ namespace JwtAuth.Controllers
 
             return Ok(new { success = true, message = "User deleted successfully." });
         }
+
         [HttpPost("generate-invite-code")]
         public async Task<IActionResult> CreateInviteCode()
         {
@@ -99,8 +103,46 @@ namespace JwtAuth.Controllers
             _context.InviteCodes.Add(inviteCode);
             await _context.SaveChangesAsync();
 
-            return Ok(new { success = true, data = inviteCode.Code });
+            return Ok(new { success = true, data = inviteCode.Code});
         }
+
+        [HttpGet("invite-codes")]
+        public async Task<IActionResult> GetAllInviteCodes()
+        {
+            var codes = await _context.InviteCodes
+                .OrderByDescending(c => c.Id)
+                .Select(c => new
+                {
+                    c.Id,
+                    c.Code,
+                    c.IsUsed,
+                    c.UsedAt,
+                    c.CreatedAt
+                })
+                .ToListAsync();
+
+            return Ok(new { success = true, data = codes });
+        }
+
+        [HttpGet("user-stats")]
+        public async Task<IActionResult> GetUserStats()
+        {
+            var totalUsers = await _context.Users.CountAsync(u => !u.IsDeleted);
+            var totalAdmins = await _context.Users.CountAsync(u => u.Role == "Admin" && !u.IsDeleted);
+            var totalActiveUsers = await _context.Users.CountAsync(u => u.Role == "User" && !u.IsDeleted);
+
+            return Ok(new
+            {
+                success = true,
+                data = new
+                {
+                    totalUsers,
+                    totalAdmins,
+                    totalActiveUsers
+                }
+            });
+        }
+
     }
 
     public class UpdateUserRoleDto

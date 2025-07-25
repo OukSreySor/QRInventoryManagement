@@ -12,7 +12,7 @@ namespace JwtAuth.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = "Admin, User")]
+    [Authorize(Roles = "Admin")]
     public class CategoryController : BaseController
     {
         private readonly AppDbContext _context;
@@ -31,7 +31,7 @@ namespace JwtAuth.Controllers
                         Id = c.Id,
                         Name = c.Name,
                         Description = c.Description,
-                        UserId = c.UserId  
+                        UserId = c.UserId
                     }).ToListAsync();
 
             return Ok(new { success = true, data = categories });
@@ -57,6 +57,20 @@ namespace JwtAuth.Controllers
                 throw new KeyNotFoundException("Category not found or access denied.");
 
             return Ok(new { success = true, data = category });
+            }
+
+            [HttpGet("names")]
+            public async Task<IActionResult> GetCategoryNames()
+            {
+                var categoryNames = await _context.Categories
+                    .Select(p => new CategoryDropdownDto
+                    {
+                        Id = p.Id,
+                        Name = p.Name
+                    })
+                    .ToListAsync();
+
+                return Ok(new { success = true, data = categoryNames });
             }
 
             [HttpPost]

@@ -94,8 +94,8 @@ namespace JwtAuth.Data
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Transaction>()
-            .Property(t => t.TransactionType)
-            .HasConversion<string>();
+                .Property(t => t.TransactionType)
+                .HasConversion<string>();
 
             modelBuilder.Entity<Product>()
                 .Property(p => p.Status)
